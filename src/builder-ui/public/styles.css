@@ -46,6 +46,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 ::selection {
   background: rgba(212, 77, 46, 0.35);
   color: var(--stardust);
