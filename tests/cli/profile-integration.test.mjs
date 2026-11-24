@@ -436,9 +436,8 @@ test('C12: generateScheduleSnippet and runSchedule produce hardened LynceusProfi
       {
         cwd: repoDir,
         platform: 'win32',
-        env: { LOCALAPPDATA: path.join(base, 'LocalAppData') },
-        homedir: path.join(base, 'Home'),
-        tmpdir: path.join(base, 'Temp'),
+        env: { LOCALAPPDATA: 'C:\\Users\\mephistopheles4\\AppData\\Local' },
+        homedir: 'C:\\Users\\mephistopheles4',
         ...io
       }
     );
@@ -446,10 +445,15 @@ test('C12: generateScheduleSnippet and runSchedule produce hardened LynceusProfi
     assert.equal(code, 0);
     const out = io.getOut();
     assert.match(out, /WARNING: --include-private is enabled/);
-    assert.ok(out.includes(`# Target path: ${path.join(privateDir, 'lynceus-refresh.ps1')}`));
+    const expectedScriptPath = 'C:\\Users\\mephistopheles4\\AppData\\Local\\lynceus\\lynceus-refresh.ps1';
+    assert.ok(out.includes(`# Target path: ${expectedScriptPath}`));
     assert.ok(out.includes("& 'node' "));
     assert.ok(out.includes("Register-ScheduledTask -TaskName 'LynceusProfileRefresh'"));
-    assert.ok(out.includes("New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \""));
+    assert.ok(
+      out.includes(
+        `New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${expectedScriptPath}"'`
+      )
+    );
     assert.ok(out.includes("& 'git' '-C' $StageDir 'add' '--' 'agent-activity/*.svg'"));
     assert.equal(out.includes('counts.json'), false);
   });
