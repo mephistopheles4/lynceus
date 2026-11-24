@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use this software, please cite it using the metadata from this file."
 type: software
 title: lynceus
-abstract: "Zero-dependency GitHub App and [bot] activity graph CLI and Agent Atlas builder UI."
+abstract: "Zero-dependency GitHub App and [bot] activity graph CLI and Builder UI."
 authors:
   - given-names: Ayman
     family-names: Diab

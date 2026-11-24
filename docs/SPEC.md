@@ -41,7 +41,7 @@ GitHub does not render contribution graphs for GitHub Apps or `[bot]` accounts, 
 | `collector` | Token resolution (`GITHUB_TOKEN` / `GH_TOKEN` / `PATH`-safe `gh`), `normalizeConfig()` closed `lynceus.json` validation (`src/collector/config.mjs`), `discoverBots`, `validateBotSlug`, GraphQL + REST `/search/commits` collector with `$after` + `node(id)` pagination & date bisection, strict `counts.json` privacy gate & `redactSecrets()` | — |
 | `renderer` | Browser-and-Node-shared ESM modules (`src/renderer/*.mjs`, zero `node:*` imports): palettes, zero-JS GitHub Light/Dark SVG generator, `<picture>` Markdown emitter (user & `org/.github`), XML/camo sanitizer | — |
 | `cli` | `lynceus` CLI (`init`, `collect`, `render`, `build`, `schedule`), `lynceus.json` & `counts.json` bounded reads, trusted-anchor segment-checked atomic `fs-safe.mjs`, Task Scheduler/cron/Actions snippet generators | `collector`, `renderer` |
-| `builder-ui` | Unified **Agent Atlas** UI: `127.0.0.1` read-only HTTP server (global `Host` guard, exact `GET` + all-`POST` `/api/*`, zero disk writes) + static `dist-pages/` demo bundle sharing `src/renderer/*.mjs` | `collector`, `renderer`, `cli` |
+| `builder-ui` | Unified **Lynceus** UI: `127.0.0.1` read-only HTTP server (global `Host` guard, exact `GET` + all-`POST` `/api/*`, zero disk writes) + static `dist-pages/` demo bundle sharing `src/renderer/*.mjs` | `collector`, `renderer`, `cli` |
 | `profile-integration` | Wiring `mephistopheles4/mephistopheles4` (`separate`, `52w`, `breakdown`, `squares`, `friendly`, SVGs-only single replaced orphan `generated` commit, Task Scheduler daily job `LynceusProfileRefresh`, README `<picture>` embeds) | `cli` |
 
 **Build order:** `collector`, `renderer` (parallel) → `cli` → `builder-ui`, `profile-integration` (parallel).
@@ -88,9 +88,9 @@ src/
     server.mjs                # Read-only 127.0.0.1 HTTP server (global Host guard, 405 methods, POST /api/*)
     security.mjs              # Host, Origin, Sec-Fetch-Site, Bearer SHA-256, CSP, no-store, MIME headers
     public/
-      index.html              # Agent Atlas shell (relative ./ URLs, ./favicon.ico, <!-- LYNCEUS_BOOTSTRAP -->)
+      index.html              # Lynceus Builder UI shell (relative ./ URLs, ./favicon.ico, <!-- LYNCEUS_BOOTSTRAP -->)
       favicon.ico             # Static favicon asset served identically by localhost & dist-pages/
-      styles.css              # Agent Atlas instrument chrome + isolated 838px README specimen
+      styles.css              # Lynceus instrument chrome + isolated 838px README specimen
       app.js                  # Pure DOM UI (zero innerHTML, blob: SVGs, bootstrap handoff, warnings/privacyNotice)
       demo-data.js            # Strict counts.json v1 synthetic 52w & 26w presets (scope.mode: "public")
 scripts/
@@ -106,7 +106,7 @@ tests/
 docs/
   SPEC.md                     # Approved V1 specification
   THREAT-MODEL.md             # Approved V1 threat model
-  DESIGN.md                   # Agent Atlas visual specification
+  DESIGN.md                   # Lynceus visual specification
   decisions/                  # Architectural decision records
 LICENSE                       # Existing MIT license in repository
 README.md
@@ -470,7 +470,7 @@ Reused by `lynceus schedule` and `builder-ui`'s `Schedule` tab (`POST /api/sched
 
 ### Unified Single-Page Architecture (`index.html`, `styles.css`, `app.js`)
 
-Adheres strictly to **Agent Atlas** (`DESIGN.md`):
+Adheres strictly to **Lynceus** visual specification (`DESIGN.md`):
 
 * Observatory shell (`#0A1021` Night Sky, `#111B33` Indigo Plate, `#090E1C` Deep Well, `#B9381D` Star Amber CTAs, `#E8A878` Glow Amber, `#4ADE80` Ephemeris Green, `#FCA5A5` Alert Coral) with isolated `838px` GitHub Light/Dark README preview specimen.
 * **Zero** `innerHTML` **& Zero inline** `style=`**:** Uses `document.createElement` + `textContent`; renders SVGs via `URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }))` inside `<img src="blob:...">`; renders non-fatal scrubbed `warnings` from `POST /api/preview`, fatal `POST /api/*` error banners (scoped so `POST /api/preview` / `POST /api/discover` errors clear stale SVG previews while `POST /api/schedule` errors clear ONLY stale schedule output, keeping valid Workbench SVG previews intact), and any non-empty `privacyNotice` in the `Schedule` tab strictly via `textContent`.

@@ -1,5 +1,5 @@
 /**
- * Read-only localhost 127.0.0.1 HTTP server for the Agent Atlas Builder UI (S7, B2).
+ * Read-only localhost 127.0.0.1 HTTP server for the Lynceus Builder UI (S7, B2).
  * Zero disk writes; serves relative static assets + all-POST JSON /api/* routes.
  */
 import { readFileSync } from 'node:fs';

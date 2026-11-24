@@ -1,7 +1,7 @@
 # Build Plan & Swarm Task Breakdown: Lynceus V1 (`mephistopheles4/lynceus`, `MEPH-6`)
 
 > **Phase:** Phase 2 Build Plan · **Target Workspace:** `H:\src\lynceus` (`base commit 4c820a4`) · **Tier:** Thorough + Sensitive route · **Runtime:** Node `>= 24.0.0`, ESM, `dependencies: {}`, `devDependencies: {}`
-> **Source Docs:** `docs/SPEC.md` (`V1 · Revision 5`), `docs/THREAT-MODEL.md` (`Revision 5`), `docs/DESIGN.md` (**Agent Atlas**), `MEPH-6`
+> **Source Docs:** `docs/SPEC.md` (`V1 · Revision 5`), `docs/THREAT-MODEL.md` (`Revision 5`), `docs/DESIGN.md` (**Lynceus**), `MEPH-6`
 
 ---
 
@@ -177,11 +177,11 @@ Spec & Threat Model Revision 5 closed all `Design round 2, final` high and mediu
   * `src/builder-ui/public/demo-data.js`
   * `scripts/build-pages.mjs`
   * `tests/builder-ui/*.test.mjs`
-* **Description:** Build the unified **Agent Atlas** (`docs/DESIGN.md`) localhost server (`127.0.0.1`), single-page UI, and GitHub Pages build/leak scanner. Enforce global `Host === 127.0.0.1:<port>` (`400`), `405` zero CORS, static `GET` MIME types including `/favicon.ico` (`image/x-icon`), `POST /api/*` pipeline (`Origin`, `Sec-Fetch-Site`, SHA-256 `Bearer`, `Content-Type`, `<= 32 KB`, opaque `{ error, message }`), `no-store`/`nosniff`/`Referrer-Policy`/`frame-ancestors 'none'`, per-request CSP `nonce`, `<!-- LYNCEUS_BOOTSTRAP -->` one-time handoff, zero `innerHTML`/inline `style=`/`localStorage`/third-party fonts, scoped fatal error banners (`POST /api/preview`/`discover` clear SVGs while `POST /api/schedule` clears ONLY schedule output), `Schedule` tab (`0`-agent guidance, optional `scriptPath` treating blank `""` as omitted, `toolRef` + `packagePin` inputs + pre-publish & private-mode guidance, `Download script` `Blob` for standalone script separate from instructions, `privacyNotice` `textContent`), decoupled `52w`/`26w` cache preserving `Configure` edits, and `build-pages.mjs` leak scan.
+* **Description:** Build the unified **Lynceus** (`docs/DESIGN.md`) localhost server (`127.0.0.1`), single-page UI, and GitHub Pages build/leak scanner. Enforce global `Host === 127.0.0.1:<port>` (`400`), `405` zero CORS, static `GET` MIME types including `/favicon.ico` (`image/x-icon`), `POST /api/*` pipeline (`Origin`, `Sec-Fetch-Site`, SHA-256 `Bearer`, `Content-Type`, `<= 32 KB`, opaque `{ error, message }`), `no-store`/`nosniff`/`Referrer-Policy`/`frame-ancestors 'none'`, per-request CSP `nonce`, `<!-- LYNCEUS_BOOTSTRAP -->` one-time handoff, zero `innerHTML`/inline `style=`/`localStorage`/third-party fonts, scoped fatal error banners (`POST /api/preview`/`discover` clear SVGs while `POST /api/schedule` clears ONLY schedule output), `Schedule` tab (`0`-agent guidance, optional `scriptPath` treating blank `""` as omitted, `toolRef` + `packagePin` inputs + pre-publish & private-mode guidance, `Download script` `Blob` for standalone script separate from instructions, `privacyNotice` `textContent`), decoupled `52w`/`26w` cache preserving `Configure` edits, and `build-pages.mjs` leak scan.
 * **Acceptance criteria:**
   - [ ] All `C9` security-boundary HTTP tests pass (including global `Host` on static `GET`, `405`, `favicon.ico` `200`, `POST /api/schedule` `400` validation).
   - [ ] All `C10` UI/Pages tests pass (`zero` `innerHTML`, scoped error preservation, `52w`/`26w` edit retention, `dist-pages/` clean under `/<repo>/` subpath with `0` 404s and `build-pages.mjs` leak scan green).
-  - [ ] Visual craft matches `docs/DESIGN.md` (**Agent Atlas** `#0A1021`/`#111B33`/`#090E1C`/`#B9381D`/`#E8A878` chrome quarantined from `#ffffff`/`#0d1117` `838px` specimen) and passes `impeccable` `audit` checks.
+  - [ ] Visual craft matches `docs/DESIGN.md` (**Lynceus** `#0A1021`/`#111B33`/`#090E1C`/`#B9381D`/`#E8A878` chrome quarantined from `#ffffff`/`#0d1117` `838px` specimen) and passes `impeccable` `audit` checks.
 * **Verification:**
   - [ ] `node scripts/test.mjs tests/builder-ui && npm run lint && npm run build:pages` passes 100%.
 * **Dependencies:** Checkpoint 2
@@ -242,7 +242,7 @@ Open `H:\src\lynceus` in a new Antigravity session and paste:
 > **Mandatory execution rules:**
 >
 > 1. Load the `swarm_pane` skill and inspect `swarm` (`models`) before spawning workers. Follow **Waves 0–4** in `TASKS.md` strictly with **disjoint file ownership** per worker (`workspace: "share"` for Wave 1 `collector || renderer` and Wave 3 `builder-ui || profile-docs`).
-> 2. Enforce TDD per claim (`C1`–`C12`), `impeccable` UI fidelity (`DESIGN.md` Agent Atlas, system font stacks only — no third-party network fonts), and include the two Revision 5 low-security hardenings + UX hygiene note pinned in `TASKS.md` (`Finding 11` `realpathSync('/tmp'|'/var/tmp')` + deepest existing ancestor `realpathSync` on script-path exclusions; `Finding 12` `'\''` quoting on `<abs-sh-path>` in `crontab`/`chmod 600`; blank `scriptPath` trimmed as omitted + standalone script `Blob` separate from instructions).
+> 2. Enforce TDD per claim (`C1`–`C12`), `impeccable` UI fidelity (`DESIGN.md` Lynceus theme, system font stacks only — no third-party network fonts), and include the two Revision 5 low-security hardenings + UX hygiene note pinned in `TASKS.md` (`Finding 11` `realpathSync('/tmp'|'/var/tmp')` + deepest existing ancestor `realpathSync` on script-path exclusions; `Finding 12` `'\''` quoting on `<abs-sh-path>` in `crontab`/`chmod 600`; blank `scriptPath` trimmed as omitted + standalone script `Blob` separate from instructions).
 > 3. Run `npm run lint && npm test && npm run build:pages` plus real browser verification (`127.0.0.1` + `dist-pages/` under `/<repo>/` subpath at `1440×900` & `390×844`) after Wave 3 merges.
 > 4. At **Test**, run fresh `behaviour-lens` + `integrity-lens` and the **mandatory Sensitive-route** `adversarial-lens` **+** `data-lens` diff review against `4c820a4` (and offer Standards pair per Cost limits), posting results to `MEPH-6` before stopping at the `S13` Deploy human checkpoints (never push `mephistopheles4/mephistopheles4` or publish to npm without explicit owner approval).
 

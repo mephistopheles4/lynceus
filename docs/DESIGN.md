@@ -1,5 +1,5 @@
 ```yaml
-name: Agent Atlas
+name: Lynceus
 description: Observational star-atlas design system for the MEPH-6 GitHub App activity SVG workbench and init configurator, framing GitHub-native Light and Dark README renders inside indigo instrument plates.
 colors:
   star-amber: "#B9381D"
@@ -162,13 +162,13 @@ components:
     width: "838px"
 ```
 
-# Design System: Agent Atlas
+# Design System: Lynceus
 
 ## Overview
 
 **Creative North Star: "The Observational Star Atlas"**
 
-Agent Atlas treats GitHub App activity graphing as an astronomical observation workbench rather than a generic developer stats card. Drawn from the Celestial Star Atlas direction (`notation-diagram-systems-star-atlas`) and adapted for high-density Operate mode across `index.html` and `configurator.html`, the workbench mounts interactive controls inside deep indigo coordinate plates pinned with rotated copper-amber reticle diamonds over a quiet stippled night sky.
+Lynceus treats GitHub App activity graphing as an astronomical observation workbench rather than a generic developer stats card. Drawn from the Celestial Star Atlas direction (`notation-diagram-systems-star-atlas`) and adapted for high-density Operate mode across `index.html` and `configurator.html`, the workbench mounts interactive controls inside deep indigo coordinate plates pinned with rotated copper-amber reticle diamonds over a quiet stippled night sky.
 
 While the outer instrument adopts cartographic precision—editorial italic `EB Garamond` titling paired strictly with crisp `Public Sans` controls and tabular `JetBrains Mono` telemetry—the specimen inside the observation stage remains uncompromised. The simulated 838px GitHub Profile README frame and its zero-JavaScript exported SVGs stay quarantined on authentic GitHub Dark and GitHub Light surfaces so developers judge real README legibility and verify the integers-only privacy boundary at a glance.
 
@@ -226,7 +226,7 @@ The palette pairs layered astronomical night navies and warm celestial copper ac
 ### Hierarchy
 
 * **Display** (`400` italic, `2rem` / `32px`, `line-height: 1.15`): Page-level `h1` plate headings (`Profile README Activity Prototypes`, `Universal App Discovery & Configurator`) in `EB Garamond` italic.
-* **Headline** (`400` italic, `1.5rem` / `24px`, `line-height: 1`, `letter-spacing: 0.01em`): Top observatory brand wordmark (`Agent Atlas`) in `EB Garamond` italic.
+* **Headline** (`400` italic, `1.5rem` / `24px`, `line-height: 1`, `letter-spacing: 0.01em`): Top observatory brand wordmark (`Lynceus`) in `EB Garamond` italic.
 * **Title** (`600`, `1.0625rem` / `17px`, `line-height: 1.5`): Configurator plate section headings (`Discovered GitHub Apps`, `Agent Labels & Color Ramps`, `Layout, Metrics & Privacy Scope`, `Live SVG Preview`, `Generated CLI Artifacts`) in `Public Sans`.
 * **Body** (`400`–`500`, `1rem` base / `0.9375rem` subtitle capped at `68ch` / `0.875rem` buttons & inputs, `line-height: 1.5`): Descriptive guidance, controls, and roster labels in `Public Sans`.
 * **Label** (`400`–`500`, `0.75rem` / `12px`, `line-height: 1.5`, `letter-spacing: 0.06em`–`0.08em`, uppercase on control labels and brand tags): Copper-amber control labels, telemetry readouts, ephemeris pills, tab buttons (`0.78rem`), and code wells (`0.76rem`, `line-height: 1.55`) in `JetBrains Mono` with `tabular-nums`.

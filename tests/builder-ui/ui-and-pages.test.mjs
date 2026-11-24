@@ -66,9 +66,9 @@ test('C10: public/* static hygiene — zero innerHTML, inline style=, localStora
   assert.ok(html.includes('src="./app.js"'));
   assert.ok(!/(?:href|src)=["']\/(?!\/)/.test(html));
 
-  // Agent Atlas visual tokens & browser surface styling
+  // Lynceus visual tokens & browser surface styling
   for (const token of ['#0A1021', '#111B33', '#090E1C', '#B9381D', '#E8A878', '#4ADE80', '#FCA5A5', '#0d1117', '#ffffff', '838px', '::selection', 'caret-color', ':focus-visible', 'tabular-nums']) {
-    assert.ok(css.includes(token), `styles.css must include Agent Atlas token/rule: ${token}`);
+    assert.ok(css.includes(token), `styles.css must include Lynceus token/rule: ${token}`);
   }
 });
 

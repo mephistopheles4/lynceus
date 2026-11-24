@@ -1,8 +1,8 @@
 # lynceus
 
-**Zero-dependency GitHub App & `[bot]` activity graph CLI and Agent Atlas Builder UI.**
+**Zero-dependency GitHub App & `[bot]` activity graph CLI and Lynceus Builder UI.**
 
-[Open the Agent Atlas live demo](https://mephistopheles4.github.io/lynceus/) (runs in pure static demo mode with synthetic data).
+[Open the Lynceus live demo](https://mephistopheles4.github.io/lynceus/) (runs in pure static demo mode with synthetic data).
 
 GitHub does not render contribution graphs for GitHub Apps or `[bot]` accounts, and bot activity never appears on a user's human contribution heatmap. `lynceus` discovers `[bot]` accounts across any user or organization's repositories, collects strictly anonymous daily integer activity totals, and renders zero-JavaScript GitHub Light/Dark SVGs and `<picture>` Markdown embeds for profile READMEs (`<owner>/<owner>` or `<owner>/.github`).
 
@@ -43,7 +43,7 @@ node bin/lynceus.mjs --help
 
 ### 1. Interactive Setup (`init`)
 
-Launch the local read-only **Agent Atlas** Builder UI (`127.0.0.1:4173` by default, falling back to an ephemeral port if `4173` is busy) to discover `[bot]` accounts, customize labels and color ramps, preview Light/Dark READMEs, and download `lynceus.json`, SVGs, or refresh scripts:
+Launch the local read-only **Lynceus** Builder UI (`127.0.0.1:4173` by default, falling back to an ephemeral port if `4173` is busy) to discover `[bot]` accounts, customize labels and color ramps, preview Light/Dark READMEs, and download `lynceus.json`, SVGs, or refresh scripts:
 
 ```sh
 lynceus init
@@ -189,7 +189,7 @@ Safety rules enforced by the CLI:
 npm run check        # Verify zero-deps/hygiene contract, lint, tests, and Pages bundle
 npm run lint         # Syntax-check all .mjs and .js files
 npm test             # Run the Node test suite (node --test)
-npm run build:pages  # Build static Agent Atlas demo bundle into dist-pages/
+npm run build:pages  # Build static Lynceus demo bundle into dist-pages/
 ```
 
 ## Contributing & Security

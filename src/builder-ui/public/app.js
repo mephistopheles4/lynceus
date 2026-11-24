@@ -1,4 +1,4 @@
-// Agent Atlas unified Builder UI controller (SPEC S7, DESIGN.md).
+// Lynceus unified Builder UI controller (SPEC S7, DESIGN.md).
 // Pure DOM construction, class-driven styling, closure-only token, system font stacks.
 
 import {

@@ -145,20 +145,6 @@ a {
   color: var(--stardust);
 }
 
-.brand-divider {
-  width: 1px;
-  height: 18px;
-  background: var(--copper-hairline-strong);
-}
-
-.brand-tag {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--glow-amber);
-}
-
 .status-cluster {
   display: flex;
   flex-wrap: wrap;

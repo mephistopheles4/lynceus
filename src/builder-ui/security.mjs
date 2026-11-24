@@ -1,5 +1,5 @@
 /**
- * Localhost HTTP security boundary for Agent Atlas Builder UI (S7, threat boundary B2).
+ * Localhost HTTP security boundary for the Lynceus Builder UI (S7, threat boundary B2).
  * Enforces global Host validation, strict method allowlist, zero CORS, static MIME types,
  * per-request CSP nonces, Origin/Sec-Fetch-Site/Bearer SHA-256 checks, and <= 32 KB JSON bodies.
  */

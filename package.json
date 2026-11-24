@@ -1,7 +1,7 @@
 {
   "name": "lynceus",
   "version": "0.1.0",
-  "description": "Zero-dependency GitHub App & [bot] activity graph CLI and Agent Atlas builder UI",
+  "description": "Zero-dependency GitHub App & [bot] activity graph CLI and Builder UI",
   "homepage": "https://mephistopheles4.github.io/lynceus/",
   "repository": {
     "type": "git",

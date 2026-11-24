@@ -1,6 +1,6 @@
 # Contributing
 
-`lynceus` is a zero-dependency Node 24 ESM CLI and local Agent Atlas Builder UI.
+`lynceus` is a zero-dependency Node 24 ESM CLI and local Lynceus Builder UI.
 Everything shipped here executes in a developer's terminal, against their GitHub
 authentication, or inside scheduled workflows — keep patches tight, verifiable,
 and free of third-party packages.
