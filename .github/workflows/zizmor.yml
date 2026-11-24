@@ -1,0 +1,73 @@
+# Audit the workflows this repository runs, with zizmor.
+#
+# Scoped to .github/workflows/ rather than the repository root so zizmor
+# focuses on workflow files (rooting at `.` also flags `dependabot-cooldown`).
+# Any finding at the default persona fails CI; see docs/security/scanners.md.
+
+name: zizmor
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install zizmor
+        run: |
+          pipx install "zizmor==1.30.1"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Check the entry point runs
+        run: zizmor --version
+
+      - name: Write the SARIF report
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          status=0
+          zizmor --strict-collection --format=sarif .github/workflows/ > "${RUNNER_TEMP}/zizmor.sarif" || status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "zizmor exited ${status} writing SARIF — the audit errored"
+            exit 1
+          fi
+
+      - name: Upload SARIF
+        if: github.event_name == 'push'
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: ${{ runner.temp }}/zizmor.sarif
+          category: zizmor
+
+      - name: Audit the workflows
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          status=0
+          zizmor --strict-collection .github/workflows/ || status=$?
+          case "$status" in
+            0)
+              echo "ok: no finding in .github/workflows/ at the default persona"
+              ;;
+            11|12|13|14)
+              echo "zizmor exited ${status} — the audit found something, listed above."
+              echo "Fix it, or argue it in the pull request. There is no baseline file here."
+              exit 1
+              ;;
+            *)
+              echo "zizmor exited ${status} — the audit errored rather than finding something."
+              exit 1
+              ;;
+          esac

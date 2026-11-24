@@ -2,6 +2,8 @@
 
 **Zero-dependency GitHub App & `[bot]` activity graph CLI and Agent Atlas Builder UI.**
 
+[Open the Agent Atlas live demo](https://mephistopheles4.github.io/lynceus/) (runs in pure static demo mode with synthetic data).
+
 GitHub does not render contribution graphs for GitHub Apps or `[bot]` accounts, and bot activity never appears on a user's human contribution heatmap. `lynceus` discovers `[bot]` accounts across any user or organization's repositories, collects strictly anonymous daily integer activity totals, and renders zero-JavaScript GitHub Light/Dark SVGs and `<picture>` Markdown embeds for profile READMEs (`<owner>/<owner>` or `<owner>/.github`).
 
 ---
@@ -184,9 +186,16 @@ Safety rules enforced by the CLI:
 ## Development
 
 ```sh
+npm run check        # Verify zero-deps/hygiene contract, lint, tests, and Pages bundle
 npm run lint         # Syntax-check all .mjs and .js files
 npm test             # Run the Node test suite (node --test)
 npm run build:pages  # Build static Agent Atlas demo bundle into dist-pages/
 ```
+
+## Contributing & Security
+
+- Read [`CONTRIBUTING.md`](CONTRIBUTING.md) before opening a pull request.
+- Report security issues privately under [`SECURITY.md`](SECURITY.md) (do not open a public issue).
+- Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 Licensed under the [MIT License](LICENSE).

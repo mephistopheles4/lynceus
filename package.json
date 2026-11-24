@@ -2,6 +2,22 @@
   "name": "lynceus",
   "version": "0.1.0",
   "description": "Zero-dependency GitHub App & [bot] activity graph CLI and Agent Atlas builder UI",
+  "homepage": "https://mephistopheles4.github.io/lynceus/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mephistopheles4/lynceus.git"
+  },
+  "bugs": {
+    "url": "https://github.com/mephistopheles4/lynceus/issues"
+  },
+  "keywords": [
+    "github",
+    "github-actions",
+    "svg",
+    "contribution-graph",
+    "bot",
+    "cli"
+  ],
   "type": "module",
   "license": "MIT",
   "bin": {
@@ -20,6 +36,7 @@
   "dependencies": {},
   "devDependencies": {},
   "scripts": {
+    "check": "node scripts/check.mjs",
     "lint": "node scripts/lint.mjs",
     "test": "node scripts/test.mjs",
     "build:pages": "node scripts/build-pages.mjs"
