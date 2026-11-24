@@ -1,0 +1,27 @@
+{
+  "name": "lynceus",
+  "version": "0.1.0",
+  "description": "Zero-dependency GitHub App & [bot] activity graph CLI and Agent Atlas builder UI",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "lynceus": "./bin/lynceus.mjs"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "scripts/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "scripts": {
+    "lint": "node scripts/lint.mjs",
+    "test": "node scripts/test.mjs",
+    "build:pages": "node scripts/build-pages.mjs"
+  }
+}

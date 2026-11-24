@@ -1,0 +1,3 @@
+dist-pages/
+*.tmp-*
+.DS_Store
