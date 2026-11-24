@@ -1,0 +1,9 @@
+dist-pages/
+node_modules/
+*.tmp-*
+*.local.*
+.DS_Store
+Thumbs.db
+# Package-manager settings files can hold a registry token; never commit one.
+.npmrc
+.yarnrc.yml

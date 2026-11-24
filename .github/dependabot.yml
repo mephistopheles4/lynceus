@@ -1,0 +1,21 @@
+# GitHub Actions updates only. Lynceus has zero runtime or dev dependencies
+# (dependencies: {} and devDependencies: {} in package.json) and refuses lockfiles
+# — see CONTRIBUTING.md and SECURITY.md.
+#
+# Every `uses:` line in .github/workflows/ is pinned to a commit SHA with a
+# version-shaped comment beside it. Dependabot updates the SHA and comment
+# together weekly, while .github/workflows/zizmor.yml runs `ref-version-mismatch`
+# against GitHub so hand-edited SHA/comment drift fails CI. See
+# docs/security/scanners.md.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns:
+          - '*'
+    commit-message:
+      prefix: 'Bump'
