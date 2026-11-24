@@ -4,7 +4,7 @@ import { ValidationError, addDays, dayNumber } from '../../src/collector/config.
 import { collectActivity, computeStreaks, computeWindow } from '../../src/collector/collect.mjs';
 import { assertStrictCountsOnly } from '../../src/collector/privacy-gate.mjs';
 import { makeProfileAgentsConfig } from '../fixtures/github-mocks.mjs';
-import { NOW, createClock, createWorldApi } from './mock-api.test.mjs';
+import { NOW, createClock, createMockApi, createWorldApi, reply } from './mock-api.mjs';
 
 const END = '2026-11-24';
 const START = '2025-11-30';
@@ -154,7 +154,8 @@ test('out-of-window events are dropped and malformed items are ignored', async (
     prsOpened: [
       { id: 'a', createdAt: '2025-11-29T23:59:59Z' }, { id: 'b', createdAt: '2025-11-30T00:00:00Z' }, { id: 'c', createdAt: '2026-11-24T23:59:59Z' },
       { id: 'd', createdAt: '2026-11-25T00:00:00Z' }, { id: 'e', createdAt: null }, { id: 'f', createdAt: 'garbage' }, { createdAt: '2026-11-24T00:00:00Z' },
-      { id: 'g', createdAt: '2026-11-24T00:00:00Z', author: { __typename: 'User', login: BASE } }
+      { id: 'g', createdAt: '2026-11-24T00:00:00Z', author: { __typename: 'User', login: BASE } },
+      { id: 'h_null', createdAt: '2026-11-24T00:00:00Z', author: null }
     ],
     commits: [
       { sha: 'x1', date: '2025-11-29T23:00:00Z' }, { sha: 'x2', date: '2025-11-30T00:00:00Z' }, { sha: 'x3', date: '2026-11-24T23:59:00Z' },
@@ -217,19 +218,111 @@ test('reviews/comments bisect up to max(utcToday, endDate) so --date in the past
   const pastEnd = '2026-06-13';
   const { startDate } = computeWindow(52, pastEnd);
   const total = dayNumber(pastEnd) - dayNumber(startDate) + 1;
-  const reviews = Array.from({ length: 1200 }, (_, i) => ({
-    id: `pr${i}`,
-    updated: i % 2 ? '2026-11-24' : addDays(startDate, i % total),
-    reviews: [{ id: `rv${i}`, createdAt: `${addDays(startDate, i % total)}T10:00:00Z`, author: botA }]
+  // Plant > 1000 items updated AFTER pastEnd (2026-07-01..2026-11-24) so upper half past pastEnd must bisect too
+  const lateUpdated = Array.from({ length: 1050 }, (_, i) => ({
+    id: `pr_late_${i}`,
+    updated: i < 525 ? '2026-08-15' : '2026-11-20',
+    reviews: [{ id: `rv_late_${i}`, createdAt: `${addDays(startDate, i % total)}T10:00:00Z`, author: botA }]
   }));
+  const earlyUpdated = Array.from({ length: 200 }, (_, i) => ({
+    id: `pr_early_${i}`,
+    updated: addDays(startDate, i % total),
+    reviews: [{ id: `rv_early_${i}`, createdAt: `${addDays(startDate, i % total)}T10:00:00Z`, author: botA }]
+  }));
+  const reviews = [...earlyUpdated, ...lateUpdated];
   const { agent, api } = await run({ reviews }, { endDate: pastEnd, cfg: config({ metrics: { prsOpened: false, prsMerged: false, commits: false, reviews: true, comments: false, issues: false } }) });
-  assert.equal(agent.totals.reviews, 1200);
+  assert.equal(agent.totals.reviews, 1250);
   const queries = api.searches.map((s) => s.q);
   assert.ok(queries[0].endsWith(`updated:>=${startDate}`));
   const bounded = queries.map((q) => /updated:(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})/.exec(q)).filter(Boolean);
   assert.ok(bounded.length > 0, 'lower halves use closed ranges');
   for (const [, a, b] of bounded) assert.ok(a <= b, `inverted bounds ${a}..${b}`);
+  assert.ok(bounded.some(([, , b]) => b > pastEnd), 'bisection splits across (pastEnd, utcToday]');
   assert.ok(queries.some((q) => /updated:>=\d{4}-\d{2}-\d{2}$/.test(q) && !q.endsWith(`updated:>=${startDate}`)), 'upper halves stay open-ended up to today');
+
+  // Future endDate (> utcToday) uses endDate as bisect upper bound without inverted bounds
+  const futureEnd = '2026-12-20';
+  const futureWin = computeWindow(52, futureEnd);
+  const futureReviews = Array.from({ length: 1100 }, (_, i) => ({
+    id: `prf_${i}`,
+    updated: i < 550 ? '2026-12-05' : '2026-12-18',
+    reviews: [{ id: `rvf_${i}`, createdAt: '2026-12-05T10:00:00Z', author: botA }]
+  }));
+  const futureRes = await collectActivity({
+    config: config({ metrics: { prsOpened: false, prsMerged: false, commits: false, reviews: true, comments: false, issues: false } }),
+    endDate: futureEnd,
+    token: 'ghp_collectTestToken123',
+    fetchFn: createWorldApi({ reviews: futureReviews }).fetchFn,
+    sleepFn: async () => {},
+    nowFn: () => NOW
+  });
+  assert.equal(futureRes.counts.window.startDate, futureWin.startDate);
+  assert.equal(futureRes.counts.agents[0].totals.reviews, 1100);
+});
+
+test('walkSearch and nestedBy reject cycling cursors and empty-page pagination loops', async () => {
+  let step = 0;
+  const cyclicSearchApi = createMockApi({
+    graphql: () => {
+      step++;
+      return makeJsonShape(step % 2 ? 'c1' : 'c2', []);
+    }
+  });
+  function makeJsonShape(cursor, nodes) {
+    return { data: { search: { issueCount: 10, pageInfo: { hasNextPage: true, endCursor: cursor }, nodes } } };
+  }
+  await assert.rejects(
+    () => collectActivity({
+      config: config({ metrics: { prsOpened: true, prsMerged: false, commits: false, reviews: false, comments: false, issues: false } }),
+      endDate: END,
+      token: 'ghp_collectTestToken123',
+      fetchFn: cyclicSearchApi.fetchFn,
+      sleepFn: async () => {},
+      nowFn: () => NOW
+    }),
+    (e) => e?.code === 'GRAPHQL_ERROR'
+  );
+
+  let nodeStep = 0;
+  const cyclicNodeApi = createMockApi({
+    graphql: (q) => {
+      if (q.includes('node(id: $nodeId)')) {
+        nodeStep++;
+        return {
+          data: {
+            node: {
+              __typename: 'PullRequest',
+              reviews: { pageInfo: { hasNextPage: true, endCursor: nodeStep % 2 ? 'nc1' : 'nc2' }, nodes: [{ id: `rv${nodeStep}`, createdAt: '2026-11-24T00:00:00Z', author: botA }] }
+            }
+          }
+        };
+      }
+      return {
+        data: {
+          search: {
+            issueCount: 1,
+            pageInfo: { hasNextPage: false, endCursor: null },
+            nodes: [{
+              __typename: 'PullRequest',
+              id: 'PR_loop',
+              reviews: { pageInfo: { hasNextPage: true, endCursor: 'nc0' }, nodes: [{ id: 'rv0', createdAt: '2026-11-24T00:00:00Z', author: botA }] }
+            }]
+          }
+        }
+      };
+    }
+  });
+  await assert.rejects(
+    () => collectActivity({
+      config: config({ metrics: { prsOpened: false, prsMerged: false, commits: false, reviews: true, comments: false, issues: false } }),
+      endDate: END,
+      token: 'ghp_collectTestToken123',
+      fetchFn: cyclicNodeApi.fetchFn,
+      sleepFn: async () => {},
+      nowFn: () => NOW
+    }),
+    (e) => e?.code === 'GRAPHQL_ERROR'
+  );
 });
 
 test('REST commits: paginates with Link rel="next", clamps, and keeps >= 2100 ms between calls', async () => {
@@ -308,7 +401,6 @@ test('generatedAt: deterministic with endDate, from the clock without it; zero-a
 });
 
 test('token errors propagate typed (401 -> AuthError exit 3)', async () => {
-  const { createMockApi, reply } = await import('./mock-api.test.mjs');
   const api = createMockApi({ graphql: () => reply({ message: 'Bad credentials' }, { status: 401 }) });
   await assert.rejects(() => collectActivity({ config: config(), endDate: END, token: 'ghp_collectTestToken123', fetchFn: api.fetchFn }), (e) => e.exitCode === 3);
   await assert.rejects(() => collectActivity({ config: config(), endDate: END }), (e) => e.exitCode === 3);

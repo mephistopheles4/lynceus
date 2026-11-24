@@ -146,7 +146,15 @@ test('fuzzed inputs either throw or yield a snippet whose attributes cannot brea
   const gen = () => Array.from({ length: 1 + rand(14) }, () => alphabet[rand(alphabet.length)]).join('');
   let accepted = 0;
   for (let i = 0; i < 3000; i++) {
-    const args = { owner: gen(), branch: gen(), subpath: gen(), markdownBase: i % 2 ? 'raw' : 'relative', agents: [{ slug: 'x-bot[bot]', label: gen() }] };
+    // Fuzz label freely while alternating valid and fuzzed owner/branch/subpath so accepted path runs heavily
+    const useValidPath = i % 3 !== 0;
+    const args = {
+      owner: useValidPath ? 'octo-bot' : gen(),
+      branch: useValidPath ? 'generated' : gen(),
+      subpath: useValidPath ? 'agent-activity' : gen(),
+      markdownBase: i % 2 ? 'raw' : 'relative',
+      agents: [{ slug: 'x-bot[bot]', label: gen() }]
+    };
     let md;
     try {
       md = renderMarkdownSnippet(args);
@@ -161,5 +169,5 @@ test('fuzzed inputs either throw or yield a snippet whose attributes cannot brea
     assert.equal(md.split('\n').filter((l) => l.startsWith('<') || l.startsWith('  <')).length, md.trimEnd().split('\n').length);
     assert.equal(/\.\.|\/\//.test(md.replaceAll('https://', '')), false, md);
   }
-  assert.ok(accepted >= 0);
+  assert.ok(accepted > 500, `Expected fuzz loop to accept > 500 valid-path inputs, got ${accepted}`);
 });

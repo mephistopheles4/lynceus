@@ -173,7 +173,7 @@ test('light and dark use only GitHub specimen colors from the S5 palettes', () =
   assert.ok(light.svg.includes(`fill="${GITHUB_THEME.light.bg}" stroke="${GITHUB_THEME.light.border}"`));
   assert.ok(dark.svg.includes(`fill="${GITHUB_THEME.dark.bg}" stroke="${GITHUB_THEME.dark.border}"`));
   assert.ok(light.svg.includes('rx="6"'));
-  for (const c of COLOR_RAMPS.emerald.light.slice(1)) assert.ok(light.svg.includes(c) || true);
+  for (const c of COLOR_RAMPS.emerald.light.slice(1)) assert.ok(light.svg.includes(c), `missing emerald light color ${c}`);
 });
 
 test('single agent legend uses the agent ramp; multi-agent legend uses the neutral ramp', () => {

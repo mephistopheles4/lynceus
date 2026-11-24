@@ -259,7 +259,7 @@ test('C9: POST /api/* enforces Origin (403), Sec-Fetch-Site (403), Bearer (401),
     });
     assert.equal(badCt.status, 415);
 
-    // Body > 32768 -> 413
+    // Body > 32768 -> 413 (via Content-Length AND via chunked stream without Content-Length)
     const bigBody = JSON.stringify({ pad: 'a'.repeat(33_000) });
     const tooLarge = await rawHttpRequest({
       port: srv.port,
@@ -269,6 +269,31 @@ test('C9: POST /api/* enforces Origin (403), Sec-Fetch-Site (403), Bearer (401),
       body: bigBody
     });
     assert.equal(tooLarge.status, 413);
+
+    const chunkedTooLarge = await new Promise((resolve, reject) => {
+      const req = http.request({
+        host: '127.0.0.1',
+        port: srv.port,
+        method: 'POST',
+        path: '/api/status',
+        headers: {
+          Host: `127.0.0.1:${srv.port}`,
+          Origin: `http://127.0.0.1:${srv.port}`,
+          'Sec-Fetch-Site': 'same-origin',
+          Authorization: `Bearer ${srv.sessionToken}`,
+          'Content-Type': 'application/json',
+          'Transfer-Encoding': 'chunked'
+        }
+      }, (res) => {
+        res.resume();
+        res.on('end', () => resolve({ status: res.statusCode }));
+      });
+      req.on('error', reject);
+      req.write(bigBody.slice(0, 16_000));
+      req.write(bigBody.slice(16_000));
+      req.end();
+    });
+    assert.equal(chunkedTooLarge.status, 413);
 
     // Invalid JSON -> 400
     const badJson = await rawHttpRequest({
@@ -556,5 +581,51 @@ test('C9: POST /api/schedule enforces 400 validations and opaque errors without 
     assert.ok(!errRes.text.includes('at '));
   } finally {
     await srv.close();
+  }
+
+  // allowIncludePrivate: true preserves includePrivate on /api/config & maps all ApiError codes
+  let nextErr = new ApiError('AUTH_FORBIDDEN');
+  const srvPriv = await startServer({
+    port: 0,
+    config: privateCfg,
+    allowIncludePrivate: true,
+    resolveTokenFn: () => ({ token: 'ghp_validTokenForErrorMap123', sourceLabel: 'env' }),
+    collectActivityFn: async () => {
+      throw nextErr;
+    }
+  });
+  try {
+    const cfgRes = await rawHttpRequest({
+      port: srvPriv.port,
+      method: 'POST',
+      path: '/api/config',
+      headers: apiHeaders(srvPriv.port, srvPriv.sessionToken),
+      body: '{}'
+    });
+    assert.equal(cfgRes.status, 200);
+    assert.equal(JSON.parse(cfgRes.text).config.includePrivate, true);
+
+    for (const [errObj, expectedStatus, expectedCode] of [
+      [new ApiError('AUTH_FORBIDDEN'), 403, 'AUTH_FORBIDDEN'],
+      [new ApiError('API_RATE_LIMIT'), 429, 'API_RATE_LIMIT'],
+      [new ApiError('API_TIMEOUT'), 504, 'API_TIMEOUT'],
+      [new ApiError('API_ERROR'), 502, 'API_ERROR'],
+      [new Error('secret ghp_ShouldNeverLeak123456'), 500, 'INTERNAL_ERROR']
+    ]) {
+      nextErr = errObj;
+      const res = await rawHttpRequest({
+        port: srvPriv.port,
+        method: 'POST',
+        path: '/api/preview',
+        headers: apiHeaders(srvPriv.port, srvPriv.sessionToken),
+        body: JSON.stringify({ config: publicCfg, live: true })
+      });
+      assert.equal(res.status, expectedStatus);
+      const parsed = JSON.parse(res.text);
+      assert.equal(parsed.error, expectedCode);
+      assert.ok(!res.text.includes('ghp_ShouldNeverLeak'));
+    }
+  } finally {
+    await srvPriv.close();
   }
 });

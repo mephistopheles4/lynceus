@@ -4,7 +4,7 @@ import { AuthError } from '../../src/collector/auth.mjs';
 import { ValidationError } from '../../src/collector/config.mjs';
 import { discoverBots, validateBotSlug } from '../../src/collector/discover.mjs';
 import { CANARY_STRINGS, makeDiscoverPage } from '../fixtures/github-mocks.mjs';
-import { createMockApi, reply } from './mock-api.test.mjs';
+import { createMockApi, reply } from './mock-api.mjs';
 
 const bot = (login) => ({ __typename: 'Bot', login });
 const user = (login) => ({ __typename: 'User', login });
@@ -25,7 +25,7 @@ test('discoverBots builds the exact bound query, tallies Bot actors and sorts by
   const api = createMockApi({
     graphql: () => makeDiscoverPage({
       nodes: [
-        issue(bot('dependabot'), [bot('renovate'), user('human'), null]),
+        issue(bot('dependabot'), [bot('renovate'), user('human'), user('spoof[bot]'), null]),
         pr(bot('renovate'), [bot('dependabot'), bot('alpha[bot]')], [user('x'), bot('dependabot')]),
         pr(user('human'), [bot('alpha[bot]')], []),
         pr(bot('bad_name'), [], [{ author: null }]),

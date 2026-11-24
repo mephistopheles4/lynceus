@@ -86,13 +86,28 @@ test('resolveSafeExecutable finds an absolute-PATH file but not a directory', ()
     const sep = isWin ? ';' : ':';
     assert.equal(resolveSafeExecutable([GH], { PATH: `${withDir}${sep}${withFile}` }), file);
     assert.equal(resolveSafeExecutable(GH, { PATH: withDir }), null);
-    assert.equal(resolveSafeExecutable([GH], { Path: withFile }), isWin || process.platform !== 'win32' ? file : null);
+    assert.equal(resolveSafeExecutable([GH], { Path: withFile }), file);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test('on POSIX a non-executable candidate is skipped', { skip: isWin }, () => {
+test('on POSIX a non-executable candidate is skipped (both real FS and injected)', () => {
+  const calls = [];
+  const res = resolveSafeExecutable(['gh'], { PATH: '/usr/local/bin:/usr/bin' }, {
+    platform: 'linux',
+    statSyncFn: (candidate) => {
+      calls.push(candidate);
+      if (candidate === path.join('/usr/local/bin', 'gh')) return { isFile: () => true, mode: 0o100644 };
+      if (candidate === path.join('/usr/bin', 'gh')) return { isFile: () => true, mode: 0o100755 };
+      throw new Error('ENOENT');
+    }
+  });
+  assert.equal(res, path.join('/usr/bin', 'gh'));
+  assert.equal(calls.length, 2);
+});
+
+test('on POSIX real FS chmod +x controls resolveSafeExecutable', { skip: isWin }, () => {
   const dir = tempDir();
   try {
     plantGh(dir, 0o644);

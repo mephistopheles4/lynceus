@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -528,5 +528,88 @@ test('schedule: requires existing config (FS_NOT_FOUND -> exit 2), enforces priv
     );
     assert.equal(codeAct, 0);
     assert.match(ioAct.getOut(), /permissions:\n {2}contents: write/);
+  });
+});
+
+test('init off-CWD serves live Builder UI assets via import.meta.url, plus collect --public-only, render defaults & spawn error fallback', async () => {
+  await withTempDirAsync(async (offCwd) => {
+    // 1. Live bin/lynceus.mjs init --port 0 --no-open from an arbitrary off-CWD directory
+    const child = spawn(process.execPath, [BIN_PATH, 'init', '--port', '0', '--no-open'], {
+      cwd: offCwd,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    try {
+      const url = await new Promise((resolve, reject) => {
+        let buf = '';
+        const timer = setTimeout(() => reject(new Error(`init off-CWD timed out; stdout=${buf}`)), 8000);
+        child.stdout.on('data', (chunk) => {
+          buf += chunk.toString('utf8');
+          const m = /http:\/\/127\.0\.0\.1:\d+/.exec(buf);
+          if (m) {
+            clearTimeout(timer);
+            resolve(m[0]);
+          }
+        });
+        child.on('exit', (code) => {
+          clearTimeout(timer);
+          reject(new Error(`init exited early with ${code}; stdout=${buf}`));
+        });
+      });
+      const rootRes = await fetch(`${url}/`);
+      assert.equal(rootRes.status, 200);
+      assert.match(await rootRes.text(), /window\.__LYNCEUS_BOOTSTRAP__/);
+      const cssRes = await fetch(`${url}/styles.css`);
+      assert.equal(cssRes.status, 200);
+      const svgModRes = await fetch(`${url}/renderer/svg.mjs`);
+      assert.equal(svgModRes.status, 200);
+    } finally {
+      child.kill();
+      await new Promise((resolve) => child.once('exit', resolve));
+    }
+
+    // 2. collect --public-only overrides private config without requiring --include-private
+    writeFileSync(path.join(offCwd, 'lynceus.json'), JSON.stringify(makeConfig({ includePrivate: true })));
+    const ioPub = makeIo();
+    let seenPriv = null;
+    const pubCode = await runCli(['collect', '--public-only'], {
+      cwd: offCwd,
+      resolveTokenFn: () => ({ token: 'ghp_pubTestToken123456', sourceLabel: 'env' }),
+      collectActivityFn: async ({ includePrivate }) => {
+        seenPriv = includePrivate;
+        return { counts: makeCounts('public'), warnings: [] };
+      },
+      ...ioPub
+    });
+    assert.equal(pubCode, 0);
+    assert.equal(seenPriv, false);
+    assert.ok(existsSync(path.join(offCwd, 'counts.json')));
+
+    // 3. render uses default ./counts.json and ./agent-activity when omitted
+    const ioRender = makeIo();
+    const renderCode = await runCli(['render', '--owner', 'octo'], { cwd: offCwd, ...ioRender });
+    assert.equal(renderCode, 0);
+    assert.ok(existsSync(path.join(offCwd, 'agent-activity', 'unified-52w-light.svg')));
+
+    // 4. Async child.on('error') fallback logs URL safely without crashing
+    const ioErr = makeIo();
+    let errorCb = null;
+    const initCode = await runCli(['init'], {
+      cwd: offCwd,
+      platform: 'linux',
+      env: { PATH: '/usr/bin' },
+      statSyncFn: (p) => ({ isFile: () => p === path.join('/usr/bin', 'xdg-open'), mode: 0o100755 }),
+      spawnFn: () => ({
+        on(ev, fn) {
+          if (ev === 'error') errorCb = fn;
+        },
+        unref() {}
+      }),
+      startServerFn: async ({ port }) => ({ port, url: `http://127.0.0.1:${port}` }),
+      ...ioErr
+    });
+    assert.equal(initCode, 0);
+    assert.equal(typeof errorCb, 'function');
+    errorCb(new Error('ENOENT'));
+    assert.match(ioErr.getErr(), /http:\/\/127\.0\.0\.1:4173/);
   });
 });

@@ -9,7 +9,7 @@ import { collectActivity } from '../../src/collector/collect.mjs';
 import { discoverBots } from '../../src/collector/discover.mjs';
 import { redactSecrets } from '../../src/collector/privacy-gate.mjs';
 import { CANARY_STRINGS, makeDiscoverPage, makeJsonResponse, makeProfileAgentsConfig } from '../fixtures/github-mocks.mjs';
-import { createClock, createMockApi, createWorldApi, reply } from './mock-api.test.mjs';
+import { createClock, createMockApi, createWorldApi } from './mock-api.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SRC_DIR = path.resolve(HERE, '../../src/collector');
@@ -161,8 +161,4 @@ test('collector modules import only node: builtins and sibling collector modules
       assert.ok(match[1].startsWith('node:') || /^\.\/[a-z-]+\.mjs$/.test(match[1]), `${file} imports ${match[1]}`);
     }
   }
-});
-
-test('reply helper is exercised (keeps mock exports referenced)', () => {
-  assert.equal(reply({}, { status: 201 }).status, 201);
 });

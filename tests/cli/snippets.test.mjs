@@ -164,16 +164,20 @@ test('Finding 11: rejects scriptPath inside repoDir, os.tmpdir, /tmp, /private/t
   }
 
   // Real filesystem symlinked ancestor test with deepest existing ancestor realpathSync
+  // Pass tmpdir outside `base` so only symlink resolution catches `link-to-repo` -> `repo`
   withTempDir((base) => {
     const repoDir = path.join(base, 'repo');
     const linkDir = path.join(base, 'link-to-repo');
+    const otherTmp = path.join(base, 'other-tmp');
     mkdirSync(repoDir);
+    mkdirSync(otherTmp);
     symlinkSync(repoDir, linkDir, 'junction');
     assert.throws(
       () => generateScheduleSnippet({
         target: 'task-scheduler',
         owner: 'octo',
         cwd: base,
+        tmpdir: otherTmp,
         repoDir,
         configPath: path.join(repoDir, 'lynceus.json'),
         scriptPath: path.join(linkDir, 'missing-child', 'deep', 'refresh.ps1')
@@ -181,6 +185,44 @@ test('Finding 11: rejects scriptPath inside repoDir, os.tmpdir, /tmp, /private/t
       (e) => e instanceof ValidationError && e.exitCode === 2
     );
   });
+
+  // Drive-relative Windows scriptPath (\my-repo\evil.ps1) resolves against cwd drive and is rejected or anchored
+  assert.throws(
+    () => generateScheduleSnippet(baseWinOpts({
+      cwd: 'D:\\Work',
+      repoDir: 'D:\\my-repo',
+      configPath: 'C:\\Private\\lynceus.json',
+      scriptPath: '\\my-repo\\evil.ps1'
+    })),
+    (e) => e instanceof ValidationError && e.exitCode === 2
+  );
+  const anchoredRes = generateScheduleSnippet(baseWinOpts({
+    cwd: 'C:\\Work',
+    repoDir: 'D:\\my-repo',
+    configPath: 'C:\\Private\\lynceus.json',
+    scriptPath: '\\outside\\refresh.ps1'
+  }));
+  assert.equal(anchoredRes.scriptPath, 'C:\\outside\\refresh.ps1');
+  assert.throws(
+    () => generateScheduleSnippet(baseWinOpts({
+      cwd: 'H:\\src\\lynceus',
+      repoDir: '.',
+      configPath: './lynceus.json',
+      scriptPath: '\\src\\lynceus\\evil.ps1'
+    })),
+    (e) => e instanceof ValidationError && e.exitCode === 2
+  );
+
+  // Extended / device Windows prefixes (\\?\ and \\.\) are rejected
+  for (const field of ['configPath', 'repoDir', 'outDir', 'scriptPath']) {
+    for (const prefix of ['\\\\?\\C:\\Work\\outside\\item', '\\\\.\\C:\\Work\\outside\\item']) {
+      assert.throws(
+        () => generateScheduleSnippet(baseWinOpts({ [field]: prefix })),
+        ValidationError,
+        `${field} ${prefix}`
+      );
+    }
+  }
 
   // Config with symlinked ancestor resolving into repo must NOT become sibling scriptPath
   const symlinkCfgRes = generateScheduleSnippet(basePosixOpts({
@@ -237,11 +279,20 @@ test('strict character, metacharacter, leading-dash, trailing-backslash, and cro
     );
   }
 
-  // Trailing backslash on PowerShell scriptPath
-  assert.throws(
-    () => generateScheduleSnippet(baseWinOpts({ scriptPath: 'D:\\Private\\refresh.ps1\\' })),
-    ValidationError
-  );
+  // Trailing backslash on non-root Windows PowerShell paths (CommandLineToArgvW guard)
+  for (const [field, val] of [
+    ['scriptPath', 'D:\\Private\\refresh.ps1\\'],
+    ['outDir', 'D:\\My Out\\'],
+    ['repoDir', 'D:\\My Repo\\'],
+    ['configPath', 'D:\\My Cfg\\lynceus.json\\'],
+    ['binPath', 'C:\\Tools\\bin.mjs\\']
+  ]) {
+    assert.throws(
+      () => generateScheduleSnippet(baseWinOpts({ [field]: val })),
+      ValidationError,
+      `trailing backslash ${field}`
+    );
+  }
 
   // Forbidden chars across params and resolved paths (post-resolve)
   const badChars = ['a\rb', 'a\nb', 'a\u0085b', 'a\u2028b', 'a\u2029b', 'a\u2018b', 'a\u201Cb', 'a"b', 'a$b', 'a`b', 'a;b', 'a|b', 'a<b', 'a>b', 'a&b'];
@@ -333,7 +384,29 @@ test('actions YAML pre-publish gating, defaultToolRef seam, relative path rules,
   }
 });
 
-test('PowerShell .ps1 generation, quoting, cleanup isolation, and real PowerShell AST parse', { skip: !isWin }, () => {
+test('PowerShell .ps1 quoting, instructions, cleanup isolation, and contract strings (cross-OS)', () => {
+  const apostropheRes = generateScheduleSnippet(baseWinOpts({ scriptPath: "D:\\O'Connor\\lynceus-refresh.ps1" }));
+  const explicitOutRes = generateScheduleSnippet(baseWinOpts({ outDir: 'D:\\Explicit\\Out', includePrivate: true, subpath: '' }));
+  const pkgRes = generateScheduleSnippet(baseWinOpts({ packagePin: 'lynceus@0.1.0', gitName: 'Lynceus Bot' }));
+
+  assert.ok(apostropheRes.snippet.includes("& 'node' 'C:\\Tools\\lynceus\\bin\\lynceus.mjs' 'build'"));
+  assert.ok(apostropheRes.snippet.includes('$CleanupOutDir = $true'));
+  assert.ok(
+    apostropheRes.instructions.includes(
+      "New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"D:\\O''Connor\\lynceus-refresh.ps1\"'"
+    )
+  );
+  assert.equal(apostropheRes.privacyNotice, '');
+
+  assert.ok(explicitOutRes.snippet.includes('$CleanupOutDir = $false'));
+  assert.ok(explicitOutRes.snippet.includes("'--include-private'"));
+  assert.ok(explicitOutRes.snippet.includes("'./*.svg'"));
+  assert.match(explicitOutRes.privacyNotice, /--include-private/);
+
+  assert.ok(pkgRes.snippet.includes("& 'lynceus' 'build'"));
+});
+
+test('PowerShell .ps1 real PowerShell AST parse', { skip: !isWin }, () => {
   const variants = [
     generateScheduleSnippet(baseWinOpts({ scriptPath: "D:\\O'Connor\\lynceus-refresh.ps1" })),
     generateScheduleSnippet(baseWinOpts({ outDir: 'D:\\Explicit\\Out', includePrivate: true, subpath: '' })),
@@ -355,24 +428,53 @@ test('PowerShell .ps1 generation, quoting, cleanup isolation, and real PowerShel
       stdio: ['pipe', 'pipe', 'pipe']
     });
   }
+});
 
-  // Verify specific contract strings
-  const [apostropheRes, explicitOutRes, pkgRes] = variants;
-  assert.ok(apostropheRes.snippet.includes("& 'node' 'C:\\Tools\\lynceus\\bin\\lynceus.mjs' 'build'"));
-  assert.ok(apostropheRes.snippet.includes('$CleanupOutDir = $true'));
-  assert.ok(
-    apostropheRes.instructions.includes(
-      "New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"D:\\O''Connor\\lynceus-refresh.ps1\"'"
-    )
-  );
-  assert.equal(apostropheRes.privacyNotice, '');
+test('POSIX cron .sh syntax check and bare-remote execution', { skip: isWin }, () => {
+  withTempDir((base) => {
+    const bare = path.join(base, 'remote.git');
+    const work = path.join(base, 'work');
+    const cfgDir = path.join(base, 'private-cfg');
+    const mockBin = path.join(base, 'mock-bin.mjs');
+    mkdirSync(cfgDir);
+    writeFileSync(
+      mockBin,
+      [
+        "import { mkdirSync, writeFileSync } from 'node:fs';",
+        "import path from 'node:path';",
+        "const idx = process.argv.indexOf('--out-dir');",
+        'const outDir = process.argv[idx + 1];',
+        'mkdirSync(outDir, { recursive: true });',
+        "writeFileSync(path.join(outDir, 'unified-52w-light.svg'), '<svg/>');"
+      ].join('\n')
+    );
 
-  assert.ok(explicitOutRes.snippet.includes('$CleanupOutDir = $false'));
-  assert.ok(explicitOutRes.snippet.includes("'--include-private'"));
-  assert.ok(explicitOutRes.snippet.includes("'./*.svg'"));
-  assert.match(explicitOutRes.privacyNotice, /--include-private/);
+    execFileSync('git', ['init', '--bare', '--initial-branch=main', bare], { stdio: 'pipe' });
+    execFileSync('git', ['clone', bare, work], { stdio: 'pipe' });
+    execFileSync('git', ['-C', work, 'config', 'user.name', 'Init'], { stdio: 'pipe' });
+    execFileSync('git', ['-C', work, 'config', 'user.email', 'init@example.com'], { stdio: 'pipe' });
+    execFileSync('git', ['-C', work, 'config', 'commit.gpgsign', 'false'], { stdio: 'pipe' });
+    writeFileSync(path.join(work, 'README.md'), '# Init\n');
+    execFileSync('git', ['-C', work, 'add', 'README.md'], { stdio: 'pipe' });
+    execFileSync('git', ['-C', work, 'commit', '-m', 'Initial commit'], { stdio: 'pipe' });
+    execFileSync('git', ['-C', work, 'push', 'origin', 'main'], { stdio: 'pipe' });
 
-  assert.ok(pkgRes.snippet.includes("& 'lynceus' 'build'"));
+    const cfgPath = path.join(cfgDir, 'lynceus.json');
+    writeFileSync(cfgPath, '{}');
+    const res = generateScheduleSnippet({
+      target: 'cron',
+      owner: 'octo',
+      repoDir: work,
+      configPath: cfgPath,
+      binPath: mockBin,
+      tmpdir: path.join(base, 'fake-tmp')
+    });
+    writeFileSync(res.scriptPath, res.snippet, { mode: 0o600 });
+    execFileSync('/bin/sh', ['-n', res.scriptPath], { stdio: 'pipe' });
+    execFileSync('/bin/sh', [res.scriptPath], { stdio: 'pipe' });
+    const count = execFileSync('git', ['--git-dir', bare, 'rev-list', '--count', 'refs/heads/generated'], { encoding: 'utf8' }).trim();
+    assert.equal(count, '1');
+  });
 });
 
 test('C11 end-to-end bare-remote orphan push, no-op skip, force-replace, and default-branch guard', { skip: !isWin }, () => {

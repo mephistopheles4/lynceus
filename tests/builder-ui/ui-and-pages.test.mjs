@@ -26,6 +26,7 @@ const {
   applyVisualOverridesToCounts,
   buildDataCacheKey,
   consumeBootstrap,
+  initApp,
   normalizeBotSlugInput
 } = await import(pathToFileURL(path.join(tmpAppDir, 'app.js')).href);
 
@@ -230,12 +231,211 @@ test('C10: build-pages.mjs builds clean dist-pages/, passes subpath fetch check,
       await assert.rejects(() => buildPages({ outDir: path.join(tmpRoot, 'dirty-out'), publicDir: dirtyPublic }));
     }
 
-    // Verify leak scanner fails when lynceus.json is present in publicDir
-    const cfgPublic = path.join(tmpRoot, 'cfg-public');
-    cpSync(PUBLIC_DIR, cfgPublic, { recursive: true });
-    writeFileSync(path.join(cfgPublic, 'lynceus.json'), '{}');
-    await assert.rejects(() => buildPages({ outDir: path.join(tmpRoot, 'cfg-out'), publicDir: cfgPublic }));
+    // Verify leak scanner fails when lynceus.json or unexpected files (e.g. .env / renamed config) exist in publicDir
+    for (const badFile of ['lynceus.json', '.env', 'private-config.json']) {
+      const cfgPublic = path.join(tmpRoot, `cfg-${badFile.replace(/[^a-z]/gi, '_')}`);
+      cpSync(PUBLIC_DIR, cfgPublic, { recursive: true });
+      writeFileSync(path.join(cfgPublic, badFile), '{}');
+      await assert.rejects(() => buildPages({ outDir: path.join(tmpRoot, 'cfg-out'), publicDir: cfgPublic }), badFile);
+    }
   } finally {
     rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});
+
+test('C10: initApp DOM wiring handles bootstrap, warnings, discover errors, schedule disabled fields, privacyNotice & Blob download', async () => {
+  const html = readFileSync(path.join(PUBLIC_DIR, 'index.html'), 'utf8');
+  const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]);
+  const elements = new Map();
+  const makeNode = (tag = 'div') => {
+    const listeners = new Map();
+    const classes = new Set();
+    const node = {
+      tagName: tag.toUpperCase(),
+      value: '',
+      checked: false,
+      disabled: false,
+      hidden: false,
+      textContent: '',
+      dataset: {},
+      attributes: new Map(),
+      children: [],
+      style: {},
+      classList: {
+        add(...xs) { xs.forEach((x) => classes.add(x)); },
+        remove(...xs) { xs.forEach((x) => classes.delete(x)); },
+        toggle(x, f) { if (f === undefined ? !classes.has(x) : f) classes.add(x); else classes.delete(x); },
+        contains(x) { return classes.has(x); }
+      },
+      setAttribute(k, v) { node.attributes.set(k, String(v)); },
+      getAttribute(k) { return node.attributes.get(k) ?? null; },
+      addEventListener(ev, fn) {
+        if (!listeners.has(ev)) listeners.set(ev, []);
+        listeners.get(ev).push(fn);
+      },
+      async dispatch(ev, extra = {}) {
+        const event = { preventDefault() {}, target: node, ...extra };
+        for (const fn of listeners.get(ev) ?? []) await fn(event);
+      },
+      appendChild(child) {
+        node.children.push(child);
+        return child;
+      },
+      append(...kids) {
+        node.children.push(...kids);
+      },
+      querySelectorAll(sel) {
+        if (sel === '[data-scope]') return scopeBtns;
+        return [];
+      },
+      replaceChildren(...kids) { node.children = [...kids]; },
+      click() { node._clicked = (node._clicked ?? 0) + 1; },
+      remove() {}
+    };
+    return node;
+  };
+  for (const id of ids) {
+    const n = makeNode(id.includes('checkbox') || id.includes('input') ? 'input' : 'div');
+    n.id = id;
+    elements.set(id, n);
+  }
+  elements.get('schedule-target-select').value = 'task-scheduler';
+  elements.get('schedule-task-name').value = 'LynceusProfileRefresh';
+  elements.get('schedule-repo-dir').value = '.';
+
+  const makeSelectorGroup = (attr, values) => values.map((v) => {
+    const n = makeNode('button');
+    n.dataset[attr] = v;
+    return n;
+  });
+  const scopeBtns = makeSelectorGroup('scope', ['user', 'org']);
+  const optionBtns = [
+    ...['unified', 'separate'].map((v) => Object.assign(makeNode('button'), { dataset: { option: 'layout', value: v } })),
+    ...['52', '26'].map((v) => Object.assign(makeNode('button'), { dataset: { option: 'windowWeeks', value: v } })),
+    ...['breakdown', 'minimal'].map((v) => Object.assign(makeNode('button'), { dataset: { option: 'detail', value: v } })),
+    ...['squares', 'magnitude'].map((v) => Object.assign(makeNode('button'), { dataset: { option: 'markStyle', value: v } })),
+    ...['friendly', 'raw'].map((v) => Object.assign(makeNode('button'), { dataset: { option: 'labelMode', value: v } }))
+  ];
+  const themeBtns = makeSelectorGroup('theme', ['both', 'dark', 'light']);
+  const metricInputs = ['prsOpened', 'prsMerged', 'commits', 'reviews', 'comments', 'issues'].map((m) => {
+    const n = makeNode('input');
+    n.dataset.metric = m;
+    n.checked = true;
+    return n;
+  });
+  const tabBtns = ['config', 'markdown', 'counts', 'schedule'].map((t) => elements.get(`tab-btn-${t}`));
+
+  const apiCalls = [];
+  const downloads = [];
+  const origWin = globalThis.window;
+  const origDoc = globalThis.document;
+  const origFetch = globalThis.fetch;
+  const origURL = globalThis.URL;
+
+  try {
+    globalThis.window = { __LYNCEUS_BOOTSTRAP__: { mode: 'local', token: 'tok-123' } };
+    globalThis.document = {
+      body: makeNode('body'),
+      createElement: (tag) => makeNode(tag),
+      createTextNode: (text) => ({ nodeType: 3, textContent: String(text) }),
+      getElementById: (id) => elements.get(id) ?? null,
+      querySelectorAll: (sel) => {
+        if (sel === '[data-metric]') return metricInputs;
+        if (sel === '.tab-btn') return tabBtns;
+        if (sel === '[data-scope]') return scopeBtns;
+        if (sel === '[data-option]') return optionBtns;
+        if (sel === '[data-theme]') return themeBtns;
+        return [];
+      }
+    };
+    globalThis.URL = {
+      createObjectURL(blob) {
+        downloads.push(blob);
+        return `blob:mock-${downloads.length}`;
+      },
+      revokeObjectURL() {}
+    };
+    globalThis.fetch = async (url, init) => {
+      const payload = JSON.parse(init.body);
+      apiCalls.push({ url, payload });
+      if (url === '/api/status') return { ok: true, status: 200, json: async () => ({ authPresent: true, authSource: 'env' }) };
+      if (url === '/api/config') return { ok: true, status: 200, json: async () => ({ hasConfig: false, config: null }) };
+      if (url === '/api/preview') {
+        const svgs = renderSvgs(DEMO_COUNTS_52W, payload.config);
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            counts: DEMO_COUNTS_52W,
+            svgs,
+            markdownSnippet: '<picture/>',
+            isSynthetic: true,
+            warnings: [{ code: 'SCOPE_CAVEAT', detail: 'Token caveat' }]
+          })
+        };
+      }
+      if (url === '/api/discover') {
+        return { ok: false, status: 502, json: async () => ({ error: 'API_ERROR', message: 'Upstream failed' }) };
+      }
+      if (url === '/api/schedule') {
+        if (payload.target === 'actions' && payload.scriptPath !== undefined) {
+          return { ok: false, status: 400, json: async () => ({ error: 'VALIDATION_ERROR', message: 'scriptPath rejected' }) };
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            filename: 'lynceus.yml',
+            scriptPath: '.github/workflows/lynceus.yml',
+            snippet: 'name: Lynceus',
+            instructions: 'Commit workflow',
+            privacyNotice: 'WARNING: private notice'
+          })
+        };
+      }
+      throw new Error(`Unexpected fetch ${url}`);
+    };
+
+    initApp();
+    await new Promise((r) => setTimeout(r, 25));
+
+    // Bootstrap consumed & warnings rendered
+    assert.equal(globalThis.window.__LYNCEUS_BOOTSTRAP__, undefined);
+    assert.equal(elements.get('warnings-banner').hidden, false);
+    assert.match(elements.get('warnings-banner').textContent, /SCOPE_CAVEAT/);
+
+    // Switch Schedule target from task-scheduler (with scriptPath entered) -> actions: disabled scriptPath must be omitted
+    elements.get('schedule-target-select').value = 'task-scheduler';
+    await elements.get('schedule-target-select').dispatch('change');
+    elements.get('schedule-script-path').value = 'D:\\Private\\refresh.ps1';
+    elements.get('schedule-target-select').value = 'actions';
+    await elements.get('schedule-target-select').dispatch('change');
+    assert.equal(elements.get('schedule-script-path').disabled, true);
+    elements.get('schedule-tool-ref').value = 'a'.repeat(40);
+    await elements.get('schedule-form').dispatch('submit');
+
+    const schedCall = apiCalls.find((c) => c.url === '/api/schedule');
+    assert.ok(schedCall);
+    assert.equal('scriptPath' in schedCall.payload && schedCall.payload.scriptPath !== undefined, false);
+    assert.equal(elements.get('schedule-error-banner').hidden, true);
+    assert.equal(elements.get('schedule-privacy-notice').textContent, 'WARNING: private notice');
+
+    // Download script triggers Blob with standalone snippet only (not instructions)
+    const beforeDownloads = downloads.length;
+    await elements.get('download-schedule-btn').dispatch('click');
+    assert.equal(downloads.length, beforeDownloads + 1);
+    assert.equal(await downloads.at(-1).text(), 'name: Lynceus');
+
+    // Discover error clears stale SVG stage
+    await elements.get('discover-btn').dispatch('click');
+    assert.equal(elements.get('global-error-banner').hidden, false);
+    assert.match(elements.get('global-error-banner').textContent, /Upstream failed/);
+    assert.equal(elements.get('stage-telemetry').textContent, 'CLEARED ON ERROR');
+    assert.equal(elements.get('readme-stage-grid').children[0]?.className, 'empty-state');
+  } finally {
+    globalThis.window = origWin;
+    globalThis.document = origDoc;
+    globalThis.fetch = origFetch;
+    globalThis.URL = origURL;
   }
 });

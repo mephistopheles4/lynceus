@@ -76,12 +76,17 @@ export async function buildPages({ outDir = DEFAULT_OUT_DIR, publicDir = PUBLIC_
     }
   }
 
-  // Ensure no real lynceus.json or counts.json slipped into dist-pages/
+  // Ensure no real lynceus.json, counts.json, or unexpected asset slipped into dist-pages/
+  const allowedAssets = new Set(REQUIRED_ASSETS);
   const files = collectFiles(outDir);
   for (const file of files) {
     const base = path.basename(file).toLowerCase();
     if (base === 'lynceus.json' || base === 'counts.json') {
       throw new Error(`Pages build leak check failed: unexpected ${base} in dist-pages`);
+    }
+    const rel = path.relative(outDir, file).replace(/\\/g, '/');
+    if (!allowedAssets.has(rel)) {
+      throw new Error(`Pages build failed: unexpected asset in dist-pages: ${rel}`);
     }
   }
 

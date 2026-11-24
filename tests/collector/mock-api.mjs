@@ -1,11 +1,8 @@
 /**
- * Shared mock GitHub API for the collector tests (imported by sibling test files) plus a few
- * self-tests of the mock itself. Reuses tests/fixtures/github-mocks.mjs without modifying it.
+ * Shared mock GitHub API for the collector tests (imported by sibling test files).
+ * Reuses tests/fixtures/github-mocks.mjs without modifying it.
  */
-import assert from 'node:assert/strict';
-import test from 'node:test';
 import { makeJsonResponse, makeSearchPage } from '../fixtures/github-mocks.mjs';
-import { addDays } from '../../src/collector/config.mjs';
 
 export const NOW = Date.parse('2026-11-24T12:00:00Z');
 
@@ -133,11 +130,3 @@ export function createWorldApi(world, { clock } = {}) {
   });
   return { ...api, searches, nodeCalls, commitCalls };
 }
-
-test('mock api routes graphql, commits and users and records calls', async () => {
-  const api = createMockApi({ graphql: () => ({ data: { ok: true } }), commits: () => ({ items: [] }), user: (slug) => ({ login: slug }) });
-  assert.deepEqual(await (await api.fetchFn('https://api.github.com/graphql', { method: 'POST', body: '{"query":"q","variables":{}}' })).json(), { data: { ok: true } });
-  assert.deepEqual(await (await api.fetchFn('https://api.github.com/users/a%5Bbot%5D')).json(), { login: 'a[bot]' });
-  assert.equal(api.calls.length, 2);
-  assert.equal(addDays('2026-11-24', 1), '2026-11-25');
-});

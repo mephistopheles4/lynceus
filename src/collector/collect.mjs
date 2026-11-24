@@ -109,7 +109,8 @@ async function walkSearch(ctx, o, a, b) {
   const q = o.makeQ(a, b);
   let after = null;
   let seen = 0;
-  for (let first = true; ; first = false) {
+  const seenCursors = new Set();
+  for (let first = true, pages = 0; ; first = false) {
     const search = (await graphql(ctx, o.query, { q, after })).search;
     if (!search || !Array.isArray(search.nodes)) throw new ApiError('GRAPHQL_ERROR');
     if (first && search.issueCount > CAP) {
@@ -124,14 +125,18 @@ async function walkSearch(ctx, o, a, b) {
       await o.onNode(node);
     }
     const info = search.pageInfo;
-    if (!info?.hasNextPage || !info.endCursor || seen >= CAP || info.endCursor === after) return;
+    if (!info?.hasNextPage || !info.endCursor || seen >= CAP) return;
+    if (search.nodes.length === 0 || seenCursors.has(info.endCursor) || ++pages >= 50) {
+      throw new ApiError('GRAPHQL_ERROR');
+    }
+    seenCursors.add(info.endCursor);
     after = info.endCursor;
   }
 }
 
 const createdBy = (field) => (ctx, agent, acc, metric, seen) => (node) => {
   if (!node?.id || seen.has(node.id)) return;
-  if (node.author != null && !isAgentActor(node.author, agent)) return;
+  if (!isAgentActor(node.author, agent)) return;
   seen.add(node.id);
   acc.add(metric, dateOf(node[field]));
 };
@@ -151,10 +156,19 @@ function nestedBy(field, nodeQuery) {
       seen.add(`node:${node.id}`);
       let conn = node[field];
       consume(conn);
-      let cursor = null;
-      while (conn?.pageInfo?.hasNextPage && conn.pageInfo.endCursor && conn.pageInfo.endCursor !== cursor) {
-        cursor = conn.pageInfo.endCursor;
+      const seenCursors = new Set();
+      let pages = 0;
+      while (conn?.pageInfo?.hasNextPage && conn.pageInfo.endCursor) {
+        const cursor = conn.pageInfo.endCursor;
+        if (seenCursors.has(cursor) || ++pages > 100) {
+          throw new ApiError('GRAPHQL_ERROR');
+        }
+        seenCursors.add(cursor);
         conn = (await graphql(ctx, nodeQuery, { nodeId: node.id, after: cursor })).node?.[field];
+        if (!conn || !Array.isArray(conn.nodes) || conn.nodes.length === 0) {
+          if (conn?.pageInfo?.hasNextPage) throw new ApiError('GRAPHQL_ERROR');
+          break;
+        }
         consume(conn);
       }
     };

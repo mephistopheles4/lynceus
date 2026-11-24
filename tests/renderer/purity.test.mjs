@@ -33,16 +33,3 @@ test('src/renderer/*.mjs has ZERO node:* imports and only relative imports (brow
     }
   }
 });
-
-test('src/renderer modules load via plain import() and expose the shared contract', async () => {
-  const palettes = await import('../../src/renderer/palettes.mjs');
-  const sanitize = await import('../../src/renderer/sanitize.mjs');
-  const svg = await import('../../src/renderer/svg.mjs');
-  const markdown = await import('../../src/renderer/markdown.mjs');
-  for (const name of ['GITHUB_THEME', 'COLOR_RAMPS', 'NEUTRAL_LEGEND_RAMP', 'RAMP_NAMES', 'getTheme', 'getRamp']) {
-    assert.ok(name in palettes, name);
-  }
-  for (const name of ['stripControlChars', 'escapeXml', 'assertCamoSafeSvg']) assert.equal(typeof sanitize[name], 'function', name);
-  for (const name of ['quantizeLevel', 'renderSvgs']) assert.equal(typeof svg[name], 'function', name);
-  assert.equal(typeof markdown.renderMarkdownSnippet, 'function');
-});

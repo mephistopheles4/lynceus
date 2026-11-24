@@ -921,11 +921,11 @@ export function initApp() {
       const res = await apiPost('/api/schedule', {
         target,
         config: state.config,
-        scriptPath: dom.scheduleScriptPath.value,
-        taskName: dom.scheduleTaskName.value,
+        scriptPath: dom.scheduleScriptPath.disabled ? undefined : dom.scheduleScriptPath.value,
+        taskName: dom.scheduleTaskName.disabled ? undefined : dom.scheduleTaskName.value,
         repoDir: dom.scheduleRepoDir.value,
-        toolRef: dom.scheduleToolRef.value,
-        packagePin: dom.schedulePackagePin.value
+        toolRef: dom.scheduleToolRef.disabled ? undefined : dom.scheduleToolRef.value,
+        packagePin: dom.schedulePackagePin.disabled ? undefined : dom.schedulePackagePin.value
       });
       state.scheduleError = '';
       state.scheduleResult = res;

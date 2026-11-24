@@ -26,6 +26,7 @@ const GIT_EMAIL_RE = /^[a-zA-Z0-9._+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 const TASK_NAME_RE = /^[a-zA-Z0-9_-]{1,64}$/;
 const ACTIONS_REL_PATH_RE = /^(?!-)[a-zA-Z0-9._-]+(?:\/[a-zA-Z0-9._-]+)*$/;
 const FORBIDDEN_CHARS_RE = /[\u0000-\u001F\u007F-\u009F\u2028\u2029\u2018-\u201B\u201C-\u201E"$;|<>`&]/;
+const WIN_DEVICE_PREFIX_RE = /^(?:\\|\/){2}[.?](?:\\|\/)/;
 
 const DEFAULT_BIN_PATH = fileURLToPath(new URL('../../bin/lynceus.mjs', import.meta.url));
 
@@ -43,6 +44,20 @@ function assertSafeChars(value, label, { disallowPercent = false } = {}) {
   }
   if (disallowPercent && value.includes('%')) {
     fail(`${label} must not contain % for cron`);
+  }
+}
+
+function assertNoWinDevicePrefix(value, label) {
+  if (typeof value === 'string' && WIN_DEVICE_PREFIX_RE.test(value)) {
+    fail(`${label} must not use Windows device or extended-length path prefixes`);
+  }
+}
+
+function assertNoTrailingBackslash(value, label, pathMod) {
+  if (typeof value !== 'string' || value === '') return;
+  const rootLen = pathMod.parse(value).root.length;
+  if (value.length > rootLen && value.endsWith('\\')) {
+    fail(`PowerShell ${label} must not end with a trailing backslash`);
   }
 }
 
@@ -67,6 +82,7 @@ function validateActionsRelPath(raw, label, { stripDefaultDotSlash = false } = {
 }
 
 function resolveLocal(pathMod, base, val) {
+  if (pathMod === path.win32) return pathMod.resolve(base, val);
   if (pathMod.isAbsolute(val)) return pathMod.normalize(val);
   if (process.platform === 'win32' && path.win32.isAbsolute(val)) return val;
   return pathMod.resolve(base, val);
@@ -670,12 +686,28 @@ export function generateScheduleSnippet(options = {}) {
     pathMod, realpathSyncFn, existsSyncFn, hasCustomRealpath, hasCustomExists
   );
 
+  const rawBinPath = options.binPath ?? DEFAULT_BIN_PATH;
+  const rawNodePath = options.nodePath ?? process.execPath;
+  for (const [label, val] of [
+    ['cwd', cwd],
+    ['repoDir', cfg.rawRepo],
+    ['configPath', cfg.rawConfig],
+    ['outDir', cfg.rawOutDir],
+    ['scriptPath', cfg.scriptPath],
+    ['binPath', rawBinPath],
+    ['nodePath', rawNodePath]
+  ]) {
+    if (val === undefined) continue;
+    assertNoWinDevicePrefix(val, label);
+    if (cfg.target === 'task-scheduler') assertNoTrailingBackslash(val, label, pathMod);
+  }
+
   const resolvedCwd = resolveLocal(pathMod, cwd, cwd);
   const resolvedRepo = resolveLocal(pathMod, resolvedCwd, cfg.rawRepo);
   const resolvedConfig = resolveLocal(pathMod, resolvedCwd, cfg.rawConfig);
   const resolvedOutDir = cfg.rawOutDir !== undefined ? resolveLocal(pathMod, resolvedCwd, cfg.rawOutDir) : undefined;
-  const resolvedBinPath = resolveLocal(pathMod, resolvedCwd, options.binPath ?? DEFAULT_BIN_PATH);
-  const resolvedNodePath = resolveLocal(pathMod, resolvedCwd, options.nodePath ?? process.execPath);
+  const resolvedBinPath = resolveLocal(pathMod, resolvedCwd, rawBinPath);
+  const resolvedNodePath = resolveLocal(pathMod, resolvedCwd, rawNodePath);
 
   const realRepo = realpathDeepestExisting(resolvedRepo);
   const realConfig = realpathDeepestExisting(resolvedConfig);
@@ -699,6 +731,8 @@ export function generateScheduleSnippet(options = {}) {
         : pathMod.join(homedir, '.local', 'state');
       rawScriptPath = pathMod.join(stateHome, 'lynceus', 'lynceus-refresh.sh');
     }
+    assertNoWinDevicePrefix(rawScriptPath, 'scriptPath');
+    if (cfg.target === 'task-scheduler') assertNoTrailingBackslash(rawScriptPath, 'scriptPath', pathMod);
   }
 
   const absScriptPath = resolveLocal(pathMod, resolvedCwd, rawScriptPath);
@@ -722,10 +756,9 @@ export function generateScheduleSnippet(options = {}) {
   ];
   if (resolvedOutDir !== undefined) toCheck.push(['outDir', resolvedOutDir]);
   for (const [label, val] of toCheck) {
+    assertNoWinDevicePrefix(val, label);
     assertSafeChars(val, label, { disallowPercent });
-  }
-  if (cfg.target === 'task-scheduler' && absScriptPath.endsWith('\\')) {
-    fail('PowerShell scriptPath must not end with a trailing backslash');
+    if (cfg.target === 'task-scheduler') assertNoTrailingBackslash(val, label, pathMod);
   }
 
   const paths = { pathMod, resolvedRepo, resolvedConfig, resolvedOutDir, absScriptPath, resolvedBinPath, resolvedNodePath };

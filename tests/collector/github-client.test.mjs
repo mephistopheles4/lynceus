@@ -3,7 +3,7 @@ import test from 'node:test';
 import { AuthError } from '../../src/collector/auth.mjs';
 import { ApiError, createGitHubClient } from '../../src/collector/github-client.mjs';
 import { CANARY_STRINGS, makeJsonResponse } from '../fixtures/github-mocks.mjs';
-import { createClock } from './mock-api.test.mjs';
+import { createClock } from './mock-api.mjs';
 
 const TOKEN = CANARY_STRINGS.token;
 
