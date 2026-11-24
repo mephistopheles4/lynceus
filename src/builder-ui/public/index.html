@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent Atlas — Lynceus GitHub Bot Activity Builder</title>
+  <link rel="icon" href="./favicon.ico">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="atlas-header">
+    <div class="header-inner">
+      <div class="brand-lockup">
+        <svg class="brand-star" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+          <path d="M10 1.5L12.1 7.9L18.5 10L12.1 12.1L10 18.5L7.9 12.1L1.5 10L7.9 7.9Z" fill="currentColor" />
+        </svg>
+        <span class="brand-title">Agent Atlas</span>
+        <span class="brand-divider" aria-hidden="true"></span>
+        <span class="brand-tag">LYNCEUS</span>
+      </div>
+
+      <nav class="view-nav" aria-label="Primary views">
+        <div class="segmented-group" role="tablist" aria-label="Builder views">
+          <button id="nav-configure" class="segmented-btn" type="button" role="tab" aria-selected="true" aria-controls="view-configure">Configure</button>
+          <button id="nav-workbench" class="segmented-btn" type="button" role="tab" aria-selected="false" aria-controls="view-workbench">Workbench</button>
+        </div>
+      </nav>
+
+      <div class="status-cluster">
+        <span class="ephemeris-pill" title="Strict integers-only privacy boundary">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 1.5L13.5 3.8V7.8C13.5 11.2 11.1 13.8 8 14.8C4.9 13.8 2.5 11.2 2.5 7.8V3.8L8 1.5Z" stroke="currentColor" stroke-width="1.4" />
+            <path d="M5.7 8.1L7.3 9.7L10.5 6.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+          <span>COUNTS ONLY · 0 REPO NAMES · 0 TITLES</span>
+        </span>
+        <span id="demo-pill" class="mode-pill mode-demo">SYNTHETIC DEMO DATA</span>
+        <span id="auth-pill" class="mode-pill mode-auth" hidden>AUTH CHECKING</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="atlas-shell">
+    <div id="global-error-banner" class="alert-banner alert-error" role="alert" hidden></div>
+    <div id="warnings-banner" class="alert-banner alert-warning" role="status" hidden></div>
+
+    <section id="view-configure" class="atlas-view" aria-labelledby="configure-heading">
+      <div class="view-intro">
+        <h1 id="configure-heading" class="plate-display">Universal App Discovery &amp; Configurator</h1>
+        <p class="view-subtitle">Select GitHub App or [bot] accounts, customize display labels and color ramps, and verify anonymous daily integer counts before rendering README specimens.</p>
+      </div>
+
+      <div class="config-grid">
+        <div class="config-col">
+          <section class="plate">
+            <span class="reticle tl" aria-hidden="true"></span>
+            <span class="reticle tr" aria-hidden="true"></span>
+            <span class="reticle bl" aria-hidden="true"></span>
+            <span class="reticle br" aria-hidden="true"></span>
+            <header class="plate-header">
+              <h2 class="plate-title">Discovered GitHub Apps</h2>
+              <span class="section-rule" aria-hidden="true"></span>
+              <span class="plate-hint">OWNER &amp; BOT ROSTER</span>
+            </header>
+
+            <div class="field-row-2">
+              <div class="field-group">
+                <label class="field-label" for="owner-input">GITHUB OWNER</label>
+                <input id="owner-input" class="atlas-input" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. octocat">
+              </div>
+              <div class="field-group">
+                <span class="field-label">ACCOUNT SCOPE</span>
+                <div id="scope-segmented" class="segmented-group" role="group" aria-label="Account scope">
+                  <button type="button" class="segmented-btn" data-scope="user" aria-pressed="true">User</button>
+                  <button type="button" class="segmented-btn" data-scope="org" aria-pressed="false">Organization</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="action-bar">
+              <button id="discover-btn" class="btn btn-secondary" type="button">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <circle cx="7" cy="7" r="4.8" stroke="currentColor" stroke-width="1.5" />
+                  <path d="M10.7 10.7L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                </svg>
+                <span>Scan GitHub Apps</span>
+              </button>
+              <span id="discover-status" class="inline-hint"></span>
+            </div>
+
+            <div id="discover-list" class="roster-well" aria-live="polite"></div>
+
+            <form id="manual-bot-form" class="manual-bot-form" novalidate>
+              <div class="field-group grow">
+                <label class="field-label" for="manual-bot-input">ADD BOT SLUG</label>
+                <input id="manual-bot-input" class="atlas-input mono-input" type="text" autocomplete="off" spellcheck="false" placeholder="my-app or my-app[bot]">
+              </div>
+              <button id="add-bot-btn" class="btn btn-primary" type="submit">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                </svg>
+                <span>Add Bot</span>
+              </button>
+            </form>
+            <p id="manual-bot-error" class="field-error" role="alert" hidden></p>
+          </section>
+
+          <section class="plate">
+            <span class="reticle tl" aria-hidden="true"></span>
+            <span class="reticle tr" aria-hidden="true"></span>
+            <span class="reticle bl" aria-hidden="true"></span>
+            <span class="reticle br" aria-hidden="true"></span>
+            <header class="plate-header">
+              <h2 class="plate-title">Agent Labels &amp; Color Ramps</h2>
+              <span class="section-rule" aria-hidden="true"></span>
+              <span id="agent-count-hint" class="plate-hint">0 / 12 SELECTED</span>
+            </header>
+            <div id="selected-agents-list" class="selected-agents-well"></div>
+          </section>
+
+          <section class="plate">
+            <span class="reticle tl" aria-hidden="true"></span>
+            <span class="reticle tr" aria-hidden="true"></span>
+            <span class="reticle bl" aria-hidden="true"></span>
+            <span class="reticle br" aria-hidden="true"></span>
+            <header class="plate-header">
+              <h2 class="plate-title">Layout, Metrics &amp; Privacy Scope</h2>
+              <span class="section-rule" aria-hidden="true"></span>
+              <span class="plate-hint">STRICT COUNTS ONLY</span>
+            </header>
+
+            <div class="field-group">
+              <span class="field-label">INCLUDED METRICS (AT LEAST 1 REQUIRED)</span>
+              <div class="metrics-grid">
+                <label class="check-tile"><input type="checkbox" data-metric="prsOpened" checked><span>PRs Opened</span></label>
+                <label class="check-tile"><input type="checkbox" data-metric="prsMerged" checked><span>PRs Merged</span></label>
+                <label class="check-tile"><input type="checkbox" data-metric="commits" checked><span>Commits</span></label>
+                <label class="check-tile"><input type="checkbox" data-metric="reviews" checked><span>Reviews</span></label>
+                <label class="check-tile"><input type="checkbox" data-metric="comments" checked><span>Comments</span></label>
+                <label class="check-tile"><input type="checkbox" data-metric="issues" checked><span>Issues</span></label>
+              </div>
+              <p id="metrics-error" class="field-error" role="alert" hidden></p>
+            </div>
+
+            <div class="privacy-optin-box">
+              <label class="check-tile privacy-tile">
+                <input id="include-private-checkbox" type="checkbox">
+                <span>Opt-in Private Counts</span>
+              </label>
+              <p class="privacy-caveat">Daily total counts pushed to a public repo stay visible in public git history. Private repository names, PR titles, and URLs are never stored or emitted.</p>
+            </div>
+
+            <div class="field-row-3">
+              <div class="field-group">
+                <label class="field-label" for="branch-input">TARGET BRANCH</label>
+                <input id="branch-input" class="atlas-input mono-input" type="text" autocomplete="off" spellcheck="false" value="generated">
+              </div>
+              <div class="field-group">
+                <label class="field-label" for="subpath-input">SVG SUBPATH</label>
+                <input id="subpath-input" class="atlas-input mono-input" type="text" autocomplete="off" spellcheck="false" value="agent-activity">
+              </div>
+              <div class="field-group">
+                <label class="field-label" for="markdown-base-select">MARKDOWN BASE</label>
+                <select id="markdown-base-select" class="atlas-input">
+                  <option value="raw">Raw GitHub URL</option>
+                  <option value="relative">Relative (./)</option>
+                </select>
+              </div>
+            </div>
+            <p id="publish-settings-error" class="field-error" role="alert" hidden></p>
+          </section>
+        </div>
+
+        <aside class="config-col config-sticky">
+          <section class="plate">
+            <span class="reticle tl" aria-hidden="true"></span>
+            <span class="reticle tr" aria-hidden="true"></span>
+            <span class="reticle bl" aria-hidden="true"></span>
+            <span class="reticle br" aria-hidden="true"></span>
+            <header class="plate-header">
+              <h2 class="plate-title">Live SVG Preview</h2>
+              <span class="section-rule" aria-hidden="true"></span>
+              <span id="config-preview-meta" class="plate-hint">READY</span>
+            </header>
+
+            <div id="config-mini-preview" class="mini-preview-stage"></div>
+
+            <div class="action-bar spread">
+              <button id="run-live-btn" class="btn btn-secondary" type="button">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M13.5 8A5.5 5.5 0 1 1 11.9 4.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                  <path d="M13.5 2.5V5.5H10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span>Fetch Live Counts</span>
+              </button>
+              <button id="open-workbench-btn" class="btn btn-primary" type="button">
+                <span>Open in Workbench</span>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M3.5 8H12.5M8.5 4L12.5 8L8.5 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+            </div>
+          </section>
+        </aside>
+      </div>
+    </section>
+
+    <section id="view-workbench" class="atlas-view" aria-labelledby="workbench-heading" hidden>
+      <div class="view-intro">
+        <h1 id="workbench-heading" class="plate-display">Profile README Activity Prototypes</h1>
+        <p class="view-subtitle">Inspect zero-JavaScript GitHub Light and Dark SVG cards inside an isolated 838px README frame, download configuration and SVG artifacts, or generate safe scheduled refresh scripts.</p>
+      </div>
+
+      <section class="plate toolbar-plate">
+        <span class="reticle tl" aria-hidden="true"></span>
+        <span class="reticle tr" aria-hidden="true"></span>
+        <span class="reticle bl" aria-hidden="true"></span>
+        <span class="reticle br" aria-hidden="true"></span>
+
+        <div class="toolbar-rows">
+          <div class="toolbar-controls">
+            <div class="control-cluster">
+              <span class="field-label">LAYOUT</span>
+              <div id="wb-layout-group" class="segmented-group" role="group" aria-label="SVG layout">
+                <button type="button" class="segmented-btn" data-option="layout" data-value="unified" aria-pressed="true">Unified</button>
+                <button type="button" class="segmented-btn" data-option="layout" data-value="separate" aria-pressed="false">Separate</button>
+              </div>
+            </div>
+
+            <div class="control-cluster">
+              <span class="field-label">WINDOW</span>
+              <div id="wb-window-group" class="segmented-group" role="group" aria-label="Time window">
+                <button type="button" class="segmented-btn" data-option="windowWeeks" data-value="52" aria-pressed="true">52w</button>
+                <button type="button" class="segmented-btn" data-option="windowWeeks" data-value="26" aria-pressed="false">26w</button>
+              </div>
+            </div>
+
+            <div class="control-cluster">
+              <span class="field-label">DETAIL</span>
+              <div id="wb-detail-group" class="segmented-group" role="group" aria-label="Detail density">
+                <button type="button" class="segmented-btn" data-option="detail" data-value="breakdown" aria-pressed="true">Breakdown</button>
+                <button type="button" class="segmented-btn" data-option="detail" data-value="minimal" aria-pressed="false">Minimal</button>
+              </div>
+            </div>
+
+            <div class="control-cluster">
+              <span class="field-label">MARKS</span>
+              <div id="wb-marks-group" class="segmented-group" role="group" aria-label="Mark style">
+                <button type="button" class="segmented-btn" data-option="markStyle" data-value="squares" aria-pressed="true">Squares</button>
+                <button type="button" class="segmented-btn" data-option="markStyle" data-value="magnitude" aria-pressed="false">Magnitude</button>
+              </div>
+            </div>
+
+            <div class="control-cluster">
+              <span class="field-label">LABELS</span>
+              <div id="wb-labels-group" class="segmented-group" role="group" aria-label="Label mode">
+                <button type="button" class="segmented-btn" data-option="labelMode" data-value="friendly" aria-pressed="true">Friendly</button>
+                <button type="button" class="segmented-btn" data-option="labelMode" data-value="raw" aria-pressed="false">Raw</button>
+              </div>
+            </div>
+
+            <div class="control-cluster">
+              <span class="field-label">SPECIMEN</span>
+              <div id="wb-theme-group" class="segmented-group" role="group" aria-label="README specimen theme">
+                <button type="button" class="segmented-btn" data-theme="both" aria-pressed="true">Side-by-Side</button>
+                <button type="button" class="segmented-btn" data-theme="dark" aria-pressed="false">Dark</button>
+                <button type="button" class="segmented-btn" data-theme="light" aria-pressed="false">Light</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="toolbar-actions">
+            <button id="wb-refresh-live-btn" class="btn btn-secondary" type="button">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M13.5 8A5.5 5.5 0 1 1 11.9 4.1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                <path d="M13.5 2.5V5.5H10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <span>Refresh Live</span>
+            </button>
+            <button id="download-config-btn" class="btn btn-secondary" type="button">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M8 2.5V10.5M4.5 7.5L8 11L11.5 7.5M3 13.5H13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <span>Download lynceus.json</span>
+            </button>
+            <button id="download-svgs-btn" class="btn btn-primary" type="button">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M8 2.5V10.5M4.5 7.5L8 11L11.5 7.5M3 13.5H13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <span>Download SVGs</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="plate stage-plate">
+        <span class="reticle tl" aria-hidden="true"></span>
+        <span class="reticle tr" aria-hidden="true"></span>
+        <span class="reticle bl" aria-hidden="true"></span>
+        <span class="reticle br" aria-hidden="true"></span>
+        <header class="plate-header">
+          <h2 class="plate-title">GitHub Profile README Observation Stage</h2>
+          <span class="section-rule" aria-hidden="true"></span>
+          <span id="stage-telemetry" class="plate-hint">838PX ISOLATED SPECIMEN</span>
+        </header>
+
+        <div id="readme-stage-grid" class="readme-stage-grid mode-both"></div>
+      </section>
+
+      <section class="plate artifacts-plate">
+        <span class="reticle tl" aria-hidden="true"></span>
+        <span class="reticle tr" aria-hidden="true"></span>
+        <span class="reticle bl" aria-hidden="true"></span>
+        <span class="reticle br" aria-hidden="true"></span>
+        <header class="plate-header">
+          <h2 class="plate-title">Generated CLI Artifacts &amp; Schedule</h2>
+          <span class="section-rule" aria-hidden="true"></span>
+          <span class="plate-hint">READ-ONLY EXPORT</span>
+        </header>
+
+        <div class="tab-strip" role="tablist" aria-label="Artifact tabs">
+          <button id="tab-btn-config" class="tab-btn" type="button" role="tab" aria-selected="true" aria-controls="tab-panel-config">lynceus.json</button>
+          <button id="tab-btn-markdown" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="tab-panel-markdown">&lt;picture&gt; Markdown</button>
+          <button id="tab-btn-counts" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="tab-panel-counts">counts.json Audit</button>
+          <button id="tab-btn-schedule" class="tab-btn" type="button" role="tab" aria-selected="false" aria-controls="tab-panel-schedule">Schedule</button>
+        </div>
+
+        <div id="tab-panel-config" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-config">
+          <div class="panel-actions">
+            <button id="copy-config-btn" class="btn btn-secondary btn-sm" type="button">Copy Output</button>
+            <button id="panel-download-config-btn" class="btn btn-ghost btn-sm" type="button">Download lynceus.json</button>
+          </div>
+          <pre id="code-well-config" class="code-well"></pre>
+        </div>
+
+        <div id="tab-panel-markdown" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-markdown" hidden>
+          <div class="panel-actions">
+            <button id="copy-markdown-btn" class="btn btn-secondary btn-sm" type="button">Copy &lt;picture&gt; Markdown</button>
+          </div>
+          <pre id="code-well-markdown" class="code-well"></pre>
+        </div>
+
+        <div id="tab-panel-counts" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-counts" hidden>
+          <div class="panel-actions">
+            <span id="counts-audit-summary" class="inline-hint"></span>
+            <button id="copy-counts-btn" class="btn btn-secondary btn-sm" type="button">Copy counts.json</button>
+          </div>
+          <pre id="code-well-counts" class="code-well"></pre>
+        </div>
+
+        <div id="tab-panel-schedule" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-schedule" hidden>
+          <div id="schedule-empty-guidance" class="guidance-box" hidden>
+            Add at least 1 GitHub App or [bot] account in Configure before generating an automated refresh schedule.
+          </div>
+
+          <div id="schedule-demo-guidance" class="guidance-box" hidden>
+            Static demo mode runs purely in the browser without a local backend. Install Lynceus and run <code class="inline-code">lynceus schedule --config ./lynceus.json --target task-scheduler|cron|actions</code> locally to generate verified refresh scripts.
+          </div>
+
+          <div id="schedule-local-pane" hidden>
+            <form id="schedule-form" class="schedule-form" novalidate>
+              <div class="field-row-3">
+                <div class="field-group">
+                  <label class="field-label" for="schedule-target-select">TARGET</label>
+                  <select id="schedule-target-select" class="atlas-input">
+                    <option value="task-scheduler">Windows Task Scheduler (.ps1)</option>
+                    <option value="cron">POSIX cron (.sh)</option>
+                    <option value="actions">GitHub Actions (.yml)</option>
+                  </select>
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="schedule-script-path">SCRIPT PATH (OPTIONAL)</label>
+                  <input id="schedule-script-path" class="atlas-input mono-input" type="text" autocomplete="off" spellcheck="false" placeholder="Leave blank for private default">
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="schedule-task-name">TASK NAME</label>
+                  <input id="schedule-task-name" class="atlas-input mono-input" type="text" autocomplete="off" spellcheck="false" value="LynceusProfileRefresh">
+                </div>
+              </div>
+
+              <div class="field-row-3">
+                <div class="field-group">
+                  <label class="field-label" for="schedule-repo-dir">REPO DIR</label>
+                  <input id="schedule-repo-dir" class="atlas-input mono-input" type="text" autocomplete="off" spellcheck="false" value=".">
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="schedule-tool-ref">TOOL REF (40-HEX SHA, ACTIONS)</label>
+                  <input id="schedule-tool-ref" class="atlas-input mono-input" type="text" autocomplete="off" spellcheck="false" placeholder="Required pre-publish for actions">
+                </div>
+                <div class="field-group">
+                  <label class="field-label" for="schedule-package-pin">PACKAGE PIN (OPTIONAL)</label>
+                  <input id="schedule-package-pin" class="atlas-input mono-input" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. lynceus@0.1.0">
+                </div>
+              </div>
+
+              <p id="schedule-prepublish-note" class="inline-note" hidden>Pre-publish GitHub Actions workflows require a 40-hex Tool Ref commit SHA (or post-publish Package Pin like lynceus@0.1.0), cannot combine both, and always enforce public-only scans.</p>
+              <p id="schedule-private-note" class="inline-note" hidden>Private counts mode is active: generated SVGs include daily aggregate totals from private activity and remain visible in public git history once pushed. GitHub Actions rejects private mode.</p>
+
+              <div class="action-bar">
+                <button id="generate-schedule-btn" class="btn btn-primary" type="submit">Generate Schedule Snippet</button>
+              </div>
+            </form>
+
+            <div id="schedule-error-banner" class="alert-banner alert-error" role="alert" hidden></div>
+
+            <div id="schedule-output" class="schedule-output" hidden>
+              <div id="schedule-privacy-notice" class="alert-banner alert-warning" role="status" hidden></div>
+              <div class="panel-actions spread">
+                <span id="schedule-script-path-readout" class="inline-hint mono-text"></span>
+                <div class="panel-actions">
+                  <button id="download-schedule-btn" class="btn btn-primary btn-sm" type="button">Download script</button>
+                  <button id="copy-schedule-btn" class="btn btn-secondary btn-sm" type="button">Copy script</button>
+                </div>
+              </div>
+              <pre id="code-well-schedule-snippet" class="code-well"></pre>
+              <div class="field-group">
+                <span class="field-label">REGISTRATION &amp; PERMISSIONS INSTRUCTIONS</span>
+                <pre id="code-well-schedule-instructions" class="code-well"></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <!-- LYNCEUS_BOOTSTRAP -->
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
