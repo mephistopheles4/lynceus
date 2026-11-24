@@ -224,6 +224,23 @@ test('Finding 11: rejects scriptPath inside repoDir, os.tmpdir, /tmp, /private/t
     }
   }
 
+  // Non-/tmp POSIX symlinked-ancestor scriptPath resolves into repo and is rejected even on Linux
+  assert.throws(
+    () => generateScheduleSnippet(basePosixOpts({
+      existsSyncFn: (p) => ['/home/octo/alias-dir', '/home/octo/repo', '/tmp', '/var/tmp'].includes(p),
+      realpathSyncFn: (p) => {
+        if (p === '/home/octo/alias-dir') return '/home/octo/repo';
+        if (p === '/home/octo/repo') return '/home/octo/repo';
+        if (p === '/tmp' || p === '/var/tmp') return p;
+        const err = new Error('ENOENT');
+        err.code = 'ENOENT';
+        throw err;
+      },
+      scriptPath: '/home/octo/alias-dir/nonexistent/refresh.sh'
+    })),
+    (e) => e instanceof ValidationError && e.exitCode === 2
+  );
+
   // Config with symlinked ancestor resolving into repo must NOT become sibling scriptPath
   const symlinkCfgRes = generateScheduleSnippet(basePosixOpts({
     existsSyncFn: (p) => ['/home/octo/alias-dir', '/home/octo/repo', '/tmp', '/var/tmp'].includes(p),
@@ -279,20 +296,20 @@ test('strict character, metacharacter, leading-dash, trailing-backslash, and cro
     );
   }
 
-  // Trailing backslash on non-root Windows PowerShell paths (CommandLineToArgvW guard)
-  for (const [field, val] of [
-    ['scriptPath', 'D:\\Private\\refresh.ps1\\'],
-    ['outDir', 'D:\\My Out\\'],
-    ['repoDir', 'D:\\My Repo\\'],
-    ['configPath', 'D:\\My Cfg\\lynceus.json\\'],
-    ['binPath', 'C:\\Tools\\bin.mjs\\']
-  ]) {
+  // Trailing backslash on PowerShell scriptPath (including bare drive root like D:\) is rejected,
+  // while tab-completed Windows directories (.\, D:\My Out\) normalize cleanly post-resolve
+  for (const badScript of ['D:\\Private\\refresh.ps1\\', 'D:\\', 'C:\\Work\\..\\..']) {
     assert.throws(
-      () => generateScheduleSnippet(baseWinOpts({ [field]: val })),
+      () => generateScheduleSnippet(baseWinOpts({ scriptPath: badScript })),
       ValidationError,
-      `trailing backslash ${field}`
+      `trailing backslash scriptPath ${badScript}`
     );
   }
+  const tabCompleted = generateScheduleSnippet(baseWinOpts({
+    repoDir: '.\\',
+    outDir: 'D:\\My Out\\'
+  }));
+  assert.ok(tabCompleted.snippet.includes("'D:\\My Out'"));
 
   // Forbidden chars across params and resolved paths (post-resolve)
   const badChars = ['a\rb', 'a\nb', 'a\u0085b', 'a\u2028b', 'a\u2029b', 'a\u2018b', 'a\u201Cb', 'a"b', 'a$b', 'a`b', 'a;b', 'a|b', 'a<b', 'a>b', 'a&b'];
@@ -431,50 +448,57 @@ test('PowerShell .ps1 real PowerShell AST parse', { skip: !isWin }, () => {
 });
 
 test('POSIX cron .sh syntax check and bare-remote execution', { skip: isWin }, () => {
-  withTempDir((base) => {
-    const bare = path.join(base, 'remote.git');
-    const work = path.join(base, 'work');
-    const cfgDir = path.join(base, 'private-cfg');
-    const mockBin = path.join(base, 'mock-bin.mjs');
-    mkdirSync(cfgDir);
-    writeFileSync(
-      mockBin,
-      [
-        "import { mkdirSync, writeFileSync } from 'node:fs';",
-        "import path from 'node:path';",
-        "const idx = process.argv.indexOf('--out-dir');",
-        'const outDir = process.argv[idx + 1];',
-        'mkdirSync(outDir, { recursive: true });',
-        "writeFileSync(path.join(outDir, 'unified-52w-light.svg'), '<svg/>');"
-      ].join('\n')
-    );
+  const stateDir = mkdtempSync(path.join(os.homedir(), '.lynceus-test-state-'));
+  try {
+    withTempDir((base) => {
+      const bare = path.join(base, 'remote.git');
+      const work = path.join(base, 'work');
+      const cfgDir = path.join(base, 'private-cfg');
+      const mockBin = path.join(base, 'mock-bin.mjs');
+      mkdirSync(cfgDir);
+      writeFileSync(
+        mockBin,
+        [
+          "import { mkdirSync, writeFileSync } from 'node:fs';",
+          "import path from 'node:path';",
+          "const idx = process.argv.indexOf('--out-dir');",
+          'const outDir = process.argv[idx + 1];',
+          'mkdirSync(outDir, { recursive: true });',
+          "writeFileSync(path.join(outDir, 'unified-52w-light.svg'), '<svg/>');"
+        ].join('\n')
+      );
 
-    execFileSync('git', ['init', '--bare', '--initial-branch=main', bare], { stdio: 'pipe' });
-    execFileSync('git', ['clone', bare, work], { stdio: 'pipe' });
-    execFileSync('git', ['-C', work, 'config', 'user.name', 'Init'], { stdio: 'pipe' });
-    execFileSync('git', ['-C', work, 'config', 'user.email', 'init@example.com'], { stdio: 'pipe' });
-    execFileSync('git', ['-C', work, 'config', 'commit.gpgsign', 'false'], { stdio: 'pipe' });
-    writeFileSync(path.join(work, 'README.md'), '# Init\n');
-    execFileSync('git', ['-C', work, 'add', 'README.md'], { stdio: 'pipe' });
-    execFileSync('git', ['-C', work, 'commit', '-m', 'Initial commit'], { stdio: 'pipe' });
-    execFileSync('git', ['-C', work, 'push', 'origin', 'main'], { stdio: 'pipe' });
+      execFileSync('git', ['init', '--bare', '--initial-branch=main', bare], { stdio: 'pipe' });
+      execFileSync('git', ['clone', bare, work], { stdio: 'pipe' });
+      execFileSync('git', ['-C', work, 'config', 'user.name', 'Init'], { stdio: 'pipe' });
+      execFileSync('git', ['-C', work, 'config', 'user.email', 'init@example.com'], { stdio: 'pipe' });
+      execFileSync('git', ['-C', work, 'config', 'commit.gpgsign', 'false'], { stdio: 'pipe' });
+      writeFileSync(path.join(work, 'README.md'), '# Init\n');
+      execFileSync('git', ['-C', work, 'add', 'README.md'], { stdio: 'pipe' });
+      execFileSync('git', ['-C', work, 'commit', '-m', 'Initial commit'], { stdio: 'pipe' });
+      execFileSync('git', ['-C', work, 'push', 'origin', 'main'], { stdio: 'pipe' });
 
-    const cfgPath = path.join(cfgDir, 'lynceus.json');
-    writeFileSync(cfgPath, '{}');
-    const res = generateScheduleSnippet({
-      target: 'cron',
-      owner: 'octo',
-      repoDir: work,
-      configPath: cfgPath,
-      binPath: mockBin,
-      tmpdir: path.join(base, 'fake-tmp')
+      const cfgPath = path.join(cfgDir, 'lynceus.json');
+      writeFileSync(cfgPath, '{}');
+      const res = generateScheduleSnippet({
+        target: 'cron',
+        owner: 'octo',
+        repoDir: work,
+        configPath: cfgPath,
+        binPath: mockBin,
+        env: { ...process.env, XDG_STATE_HOME: stateDir },
+        tmpdir: path.join(base, 'fake-tmp')
+      });
+      mkdirSync(path.dirname(res.scriptPath), { recursive: true });
+      writeFileSync(res.scriptPath, res.snippet, { mode: 0o600 });
+      execFileSync('/bin/sh', ['-n', res.scriptPath], { stdio: 'pipe' });
+      execFileSync('/bin/sh', [res.scriptPath], { stdio: 'pipe' });
+      const count = execFileSync('git', ['--git-dir', bare, 'rev-list', '--count', 'refs/heads/generated'], { encoding: 'utf8' }).trim();
+      assert.equal(count, '1');
     });
-    writeFileSync(res.scriptPath, res.snippet, { mode: 0o600 });
-    execFileSync('/bin/sh', ['-n', res.scriptPath], { stdio: 'pipe' });
-    execFileSync('/bin/sh', [res.scriptPath], { stdio: 'pipe' });
-    const count = execFileSync('git', ['--git-dir', bare, 'rev-list', '--count', 'refs/heads/generated'], { encoding: 'utf8' }).trim();
-    assert.equal(count, '1');
-  });
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true });
+  }
 });
 
 test('C11 end-to-end bare-remote orphan push, no-op skip, force-replace, and default-branch guard', { skip: !isWin }, () => {

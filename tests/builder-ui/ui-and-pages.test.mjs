@@ -231,12 +231,14 @@ test('C10: build-pages.mjs builds clean dist-pages/, passes subpath fetch check,
       await assert.rejects(() => buildPages({ outDir: path.join(tmpRoot, 'dirty-out'), publicDir: dirtyPublic }));
     }
 
-    // Verify leak scanner fails when lynceus.json or unexpected files (e.g. .env / renamed config) exist in publicDir
     for (const badFile of ['lynceus.json', '.env', 'private-config.json']) {
       const cfgPublic = path.join(tmpRoot, `cfg-${badFile.replace(/[^a-z]/gi, '_')}`);
       cpSync(PUBLIC_DIR, cfgPublic, { recursive: true });
       writeFileSync(path.join(cfgPublic, badFile), '{}');
-      await assert.rejects(() => buildPages({ outDir: path.join(tmpRoot, 'cfg-out'), publicDir: cfgPublic }), badFile);
+      await assert.rejects(
+        () => buildPages({ outDir: path.join(tmpRoot, 'cfg-out'), publicDir: cfgPublic }),
+        new RegExp(badFile.replace(/\./g, '\\.'))
+      );
     }
   } finally {
     rmSync(tmpRoot, { recursive: true, force: true });

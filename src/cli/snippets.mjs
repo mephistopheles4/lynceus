@@ -53,9 +53,9 @@ function assertNoWinDevicePrefix(value, label) {
   }
 }
 
-function assertNoTrailingBackslash(value, label, pathMod) {
+function assertNoTrailingBackslash(value, label, pathMod, { allowRoot = true } = {}) {
   if (typeof value !== 'string' || value === '') return;
-  const rootLen = pathMod.parse(value).root.length;
+  const rootLen = allowRoot ? pathMod.parse(value).root.length : 0;
   if (value.length > rootLen && value.endsWith('\\')) {
     fail(`PowerShell ${label} must not end with a trailing backslash`);
   }
@@ -699,7 +699,9 @@ export function generateScheduleSnippet(options = {}) {
   ]) {
     if (val === undefined) continue;
     assertNoWinDevicePrefix(val, label);
-    if (cfg.target === 'task-scheduler') assertNoTrailingBackslash(val, label, pathMod);
+  }
+  if (cfg.target === 'task-scheduler' && cfg.scriptPath !== undefined) {
+    assertNoTrailingBackslash(cfg.scriptPath, 'scriptPath', pathMod, { allowRoot: false });
   }
 
   const resolvedCwd = resolveLocal(pathMod, cwd, cwd);
@@ -732,7 +734,9 @@ export function generateScheduleSnippet(options = {}) {
       rawScriptPath = pathMod.join(stateHome, 'lynceus', 'lynceus-refresh.sh');
     }
     assertNoWinDevicePrefix(rawScriptPath, 'scriptPath');
-    if (cfg.target === 'task-scheduler') assertNoTrailingBackslash(rawScriptPath, 'scriptPath', pathMod);
+    if (cfg.target === 'task-scheduler') {
+      assertNoTrailingBackslash(rawScriptPath, 'scriptPath', pathMod, { allowRoot: false });
+    }
   }
 
   const absScriptPath = resolveLocal(pathMod, resolvedCwd, rawScriptPath);
@@ -758,7 +762,9 @@ export function generateScheduleSnippet(options = {}) {
   for (const [label, val] of toCheck) {
     assertNoWinDevicePrefix(val, label);
     assertSafeChars(val, label, { disallowPercent });
-    if (cfg.target === 'task-scheduler') assertNoTrailingBackslash(val, label, pathMod);
+    if (cfg.target === 'task-scheduler') {
+      assertNoTrailingBackslash(val, label, pathMod, { allowRoot: label !== 'scriptPath' });
+    }
   }
 
   const paths = { pathMod, resolvedRepo, resolvedConfig, resolvedOutDir, absScriptPath, resolvedBinPath, resolvedNodePath };

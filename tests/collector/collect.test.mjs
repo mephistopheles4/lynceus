@@ -261,28 +261,43 @@ test('reviews/comments bisect up to max(utcToday, endDate) so --date in the past
 });
 
 test('walkSearch and nestedBy reject cycling cursors and empty-page pagination loops', async () => {
+  const runPrSearch = (fetchFn) => collectActivity({
+    config: config({ metrics: { prsOpened: true, prsMerged: false, commits: false, reviews: false, comments: false, issues: false } }),
+    endDate: END,
+    token: 'ghp_collectTestToken123',
+    fetchFn,
+    sleepFn: async () => {},
+    nowFn: () => NOW
+  });
+
+  // 1. Cycling non-empty search pages fail on page 3 via seenCursors (c1 -> c2 -> c1)
   let step = 0;
   const cyclicSearchApi = createMockApi({
     graphql: () => {
       step++;
-      return makeJsonShape(step % 2 ? 'c1' : 'c2', []);
+      const cursor = step % 2 ? 'c1' : 'c2';
+      return {
+        data: {
+          search: {
+            issueCount: 10,
+            pageInfo: { hasNextPage: true, endCursor: cursor },
+            nodes: [{ id: `p_cyc_${step}`, createdAt: '2026-11-24T00:00:00Z', author: botA }]
+          }
+        }
+      };
     }
   });
-  function makeJsonShape(cursor, nodes) {
-    return { data: { search: { issueCount: 10, pageInfo: { hasNextPage: true, endCursor: cursor }, nodes } } };
-  }
-  await assert.rejects(
-    () => collectActivity({
-      config: config({ metrics: { prsOpened: true, prsMerged: false, commits: false, reviews: false, comments: false, issues: false } }),
-      endDate: END,
-      token: 'ghp_collectTestToken123',
-      fetchFn: cyclicSearchApi.fetchFn,
-      sleepFn: async () => {},
-      nowFn: () => NOW
-    }),
-    (e) => e?.code === 'GRAPHQL_ERROR'
-  );
+  await assert.rejects(() => runPrSearch(cyclicSearchApi.fetchFn), (e) => e?.code === 'GRAPHQL_ERROR');
+  assert.equal(cyclicSearchApi.calls.length, 3);
 
+  // 2. Empty search page with hasNextPage: true stops on page 1
+  const emptySearchApi = createMockApi({
+    graphql: () => ({ data: { search: { issueCount: 10, pageInfo: { hasNextPage: true, endCursor: 'c_empty' }, nodes: [] } } })
+  });
+  await assert.rejects(() => runPrSearch(emptySearchApi.fetchFn), (e) => e?.code === 'GRAPHQL_ERROR');
+  assert.equal(emptySearchApi.calls.length, 1);
+
+  // 3. Cycling node(id) pages fail within 4 calls via seenCursors (not pages > 100)
   let nodeStep = 0;
   const cyclicNodeApi = createMockApi({
     graphql: (q) => {
@@ -323,6 +338,41 @@ test('walkSearch and nestedBy reject cycling cursors and empty-page pagination l
     }),
     (e) => e?.code === 'GRAPHQL_ERROR'
   );
+  assert.ok(cyclicNodeApi.calls.length <= 4, `expected seenCursors to break in <= 4 calls, got ${cyclicNodeApi.calls.length}`);
+
+  // 4. Empty node(id) page with hasNextPage: true fails on first follow-up call
+  const emptyNodeApi = createMockApi({
+    graphql: (q) => {
+      if (q.includes('node(id: $nodeId)')) {
+        return { data: { node: { __typename: 'PullRequest', reviews: { pageInfo: { hasNextPage: true, endCursor: 'nc_next' }, nodes: [] } } } };
+      }
+      return {
+        data: {
+          search: {
+            issueCount: 1,
+            pageInfo: { hasNextPage: false, endCursor: null },
+            nodes: [{
+              __typename: 'PullRequest',
+              id: 'PR_empty_node',
+              reviews: { pageInfo: { hasNextPage: true, endCursor: 'nc_first' }, nodes: [{ id: 'rv_e', createdAt: '2026-11-24T00:00:00Z', author: botA }] }
+            }]
+          }
+        }
+      };
+    }
+  });
+  await assert.rejects(
+    () => collectActivity({
+      config: config({ metrics: { prsOpened: false, prsMerged: false, commits: false, reviews: true, comments: false, issues: false } }),
+      endDate: END,
+      token: 'ghp_collectTestToken123',
+      fetchFn: emptyNodeApi.fetchFn,
+      sleepFn: async () => {},
+      nowFn: () => NOW
+    }),
+    (e) => e?.code === 'GRAPHQL_ERROR'
+  );
+  assert.equal(emptyNodeApi.calls.length, 2);
 });
 
 test('REST commits: paginates with Link rel="next", clamps, and keeps >= 2100 ms between calls', async () => {
