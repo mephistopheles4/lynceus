@@ -492,6 +492,29 @@ a {
   color: var(--ephemeris-green);
 }
 
+@keyframes lynceus-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.btn.is-loading svg {
+  animation: lynceus-spin 0.9s linear infinite;
+}
+
+.readme-stage-grid.is-loading,
+.mini-preview-stage.is-loading {
+  opacity: 0.58;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn.is-loading svg {
+    animation: none;
+  }
+}
+
 /* Segmented Controls */
 .segmented-group {
   display: inline-flex;

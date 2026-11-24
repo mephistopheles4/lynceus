@@ -141,6 +141,7 @@ function createInitialState(mode) {
     authSource: null,
     preferLive: false,
     isSynthetic: true,
+    isRefreshing: false,
     config: cloneConfig(DEMO_DEFAULT_CONFIG),
     discoveredBots: mode === 'demo' ? [...DEMO_DISCOVERED_BOTS] : [],
     counts: cloneConfigCounts(DEMO_COUNTS_52W),
@@ -206,6 +207,7 @@ export function initApp() {
   const bootstrap = consumeBootstrap(window);
   const state = createInitialState(bootstrap.mode);
   let activeBlobUrls = [];
+  let previewReqId = 0;
 
   const revokeBlobUrls = () => {
     for (const u of activeBlobUrls) URL.revokeObjectURL(u);
@@ -271,8 +273,10 @@ export function initApp() {
     configPreviewMeta: document.getElementById('config-preview-meta'),
     configMiniPreview: document.getElementById('config-mini-preview'),
     runLiveBtn: document.getElementById('run-live-btn'),
+    runLiveBtnLabel: document.getElementById('run-live-btn-label'),
     openWorkbenchBtn: document.getElementById('open-workbench-btn'),
     wbRefreshLiveBtn: document.getElementById('wb-refresh-live-btn'),
+    wbRefreshLiveBtnLabel: document.getElementById('wb-refresh-live-btn-label'),
     downloadConfigBtn: document.getElementById('download-config-btn'),
     downloadSvgsBtn: document.getElementById('download-svgs-btn'),
     stageTelemetry: document.getElementById('stage-telemetry'),
@@ -345,8 +349,9 @@ export function initApp() {
         dom.authPill.textContent = `AUTH: ${(state.authSource ?? 'env').toUpperCase()}`;
         dom.authPill.classList.add('is-ok');
         dom.discoverBtn.disabled = false;
-        dom.runLiveBtn.disabled = state.config.agents.length === 0;
-        dom.wbRefreshLiveBtn.disabled = state.config.agents.length === 0;
+        const refreshDisabled = state.config.agents.length === 0 || state.isRefreshing;
+        dom.runLiveBtn.disabled = refreshDisabled;
+        dom.wbRefreshLiveBtn.disabled = refreshDisabled;
       } else {
         dom.authPill.textContent = 'AUTH: MISSING';
         dom.authPill.classList.add('is-warning');
@@ -647,6 +652,29 @@ export function initApp() {
     renderArtifactTabs();
   }
 
+  function renderRefreshBusyState(wantLive) {
+    const busy = state.isRefreshing;
+    for (const target of [dom.runLiveBtn, dom.wbRefreshLiveBtn, dom.readmeStageGrid, dom.configMiniPreview]) {
+      if (!target) continue;
+      if (busy) {
+        target.classList.add('is-loading');
+        target.setAttribute('aria-busy', 'true');
+      } else {
+        target.classList.remove('is-loading');
+        target.removeAttribute('aria-busy');
+      }
+    }
+    if (busy) {
+      if (dom.runLiveBtnLabel) dom.runLiveBtnLabel.textContent = wantLive ? 'Fetching Live…' : 'Loading…';
+      if (dom.wbRefreshLiveBtnLabel) dom.wbRefreshLiveBtnLabel.textContent = wantLive ? 'Refreshing…' : 'Loading…';
+      if (dom.stageTelemetry) dom.stageTelemetry.textContent = wantLive ? 'FETCHING LIVE COUNTS…' : 'LOADING PREVIEW…';
+      if (dom.configPreviewMeta) dom.configPreviewMeta.textContent = wantLive ? 'FETCHING LIVE…' : 'LOADING…';
+    } else {
+      if (dom.runLiveBtnLabel) dom.runLiveBtnLabel.textContent = 'Fetch Live Counts';
+      if (dom.wbRefreshLiveBtnLabel) dom.wbRefreshLiveBtnLabel.textContent = 'Refresh Live';
+    }
+  }
+
   async function refreshDataAndRender({ forceLive = false } = {}) {
     if (!validatePublishSettings()) return;
     const key = buildDataCacheKey(state.config);
@@ -670,12 +698,20 @@ export function initApp() {
       return;
     }
 
+    if (forceLive && state.isRefreshing) return;
+
     const wantLive = (forceLive || state.preferLive) && state.authPresent && state.config.agents.length > 0;
+    const reqId = ++previewReqId;
+    state.isRefreshing = true;
+    renderStatusChrome();
+    renderRefreshBusyState(wantLive);
+
     try {
       const data = await apiPost('/api/preview', {
         config: state.config,
         live: wantLive
       });
+      if (reqId !== previewReqId) return;
       state.counts = data.counts;
       state.svgs = data.svgs;
       state.markdownSnippet = data.markdownSnippet;
@@ -689,7 +725,12 @@ export function initApp() {
       });
       if (wantLive) state.preferLive = true;
     } catch (err) {
+      if (reqId !== previewReqId) return;
       applyScopedError(state, 'preview', err.message);
+    } finally {
+      if (reqId !== previewReqId) return;
+      state.isRefreshing = false;
+      renderRefreshBusyState(false);
     }
 
     renderStatusChrome();

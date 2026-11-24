@@ -271,6 +271,7 @@ test('C10: initApp DOM wiring handles bootstrap, warnings, discover errors, sche
       },
       setAttribute(k, v) { node.attributes.set(k, String(v)); },
       getAttribute(k) { return node.attributes.get(k) ?? null; },
+      removeAttribute(k) { node.attributes.delete(k); },
       addEventListener(ev, fn) {
         if (!listeners.has(ev)) listeners.set(ev, []);
         listeners.get(ev).push(fn);
@@ -357,12 +358,16 @@ test('C10: initApp DOM wiring handles bootstrap, warnings, discover errors, sche
       },
       revokeObjectURL() {}
     };
+    let releasePendingPreview = null;
     globalThis.fetch = async (url, init) => {
       const payload = JSON.parse(init.body);
       apiCalls.push({ url, payload });
       if (url === '/api/status') return { ok: true, status: 200, json: async () => ({ authPresent: true, authSource: 'env' }) };
       if (url === '/api/config') return { ok: true, status: 200, json: async () => ({ hasConfig: false, config: null }) };
       if (url === '/api/preview') {
+        if (releasePendingPreview) {
+          await new Promise((resolve) => { releasePendingPreview.push(resolve); });
+        }
         const svgs = renderSvgs(DEMO_COUNTS_52W, payload.config);
         return {
           ok: true,
@@ -371,7 +376,7 @@ test('C10: initApp DOM wiring handles bootstrap, warnings, discover errors, sche
             counts: DEMO_COUNTS_52W,
             svgs,
             markdownSnippet: '<picture/>',
-            isSynthetic: true,
+            isSynthetic: !payload.live,
             warnings: [{ code: 'SCOPE_CAVEAT', detail: 'Token caveat' }]
           })
         };
@@ -427,6 +432,31 @@ test('C10: initApp DOM wiring handles bootstrap, warnings, discover errors, sche
     await elements.get('download-schedule-btn').dispatch('click');
     assert.equal(downloads.length, beforeDownloads + 1);
     assert.equal(await downloads.at(-1).text(), 'name: Lynceus');
+
+    // Live refresh shows loading indicator, disables refresh buttons, and blocks overlapping clicks
+    releasePendingPreview = [];
+    const beforeRefreshCalls = apiCalls.filter((c) => c.url === '/api/preview').length;
+    const pendingClick = elements.get('wb-refresh-live-btn').dispatch('click');
+    await new Promise((r) => setTimeout(r, 10));
+    assert.equal(elements.get('wb-refresh-live-btn').disabled, true);
+    assert.equal(elements.get('run-live-btn').disabled, true);
+    assert.equal(elements.get('wb-refresh-live-btn').getAttribute('aria-busy'), 'true');
+    assert.equal(elements.get('wb-refresh-live-btn-label').textContent, 'Refreshing…');
+    assert.equal(elements.get('run-live-btn-label').textContent, 'Fetching Live…');
+    assert.equal(elements.get('stage-telemetry').textContent, 'FETCHING LIVE COUNTS…');
+    assert.equal(elements.get('readme-stage-grid').classList.contains('is-loading'), true);
+
+    await elements.get('wb-refresh-live-btn').dispatch('click');
+    assert.equal(apiCalls.filter((c) => c.url === '/api/preview').length, beforeRefreshCalls + 1);
+
+    releasePendingPreview.forEach((fn) => fn());
+    releasePendingPreview = null;
+    await pendingClick;
+    assert.equal(elements.get('wb-refresh-live-btn').disabled, false);
+    assert.equal(elements.get('wb-refresh-live-btn').getAttribute('aria-busy'), null);
+    assert.equal(elements.get('wb-refresh-live-btn-label').textContent, 'Refresh Live');
+    assert.equal(elements.get('run-live-btn-label').textContent, 'Fetch Live Counts');
+    assert.equal(elements.get('readme-stage-grid').classList.contains('is-loading'), false);
 
     // Discover error clears stale SVG stage
     await elements.get('discover-btn').dispatch('click');
